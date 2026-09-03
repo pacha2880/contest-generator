@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+
+.env
+.venv/
+venv/
+
+credentials.json
+solved.txt
+results.txt
+
+.DS_Store
+Thumbs.db
