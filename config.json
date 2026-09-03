@@ -90,5 +90,11 @@
         "800"
     ],
     "sheets_url": "https://docs.google.com/spreadsheets/d/1r3DtJmLLfe71z-kavyngaYmfs63xQq0Vq2aQd6d4Lq8/edit?usp=sharing",
-    "credentials_file": "credentials.json"
+    "credentials_file": "credentials.json",
+    "atcoder": {
+        "users": ["pacha2880", "DilanJCM8787", "AMAMEMIE", "pypyroxboy"],
+        "count": 5,
+        "lookback": 50,
+        "output_links": "outputs/atcoder_links.txt"
+    }
 }

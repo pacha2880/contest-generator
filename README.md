@@ -20,10 +20,13 @@ ProblemsHunter genera contests de entrenamiento con problemas de Codeforces que 
 | `generate_contest.py` | Script auxiliar para generar contests. |
 | `read_sheet.py` | Script auxiliar para leer datos del sheet. |
 | `update_labels.py` | Script auxiliar para actualizar etiquetas/metadatos. |
-| `config.json` | Configuración local: usuarios, dificultades, URL del sheet y credenciales. |
+| `main.py` | Punto de entrada para elegir flujo: `py main.py codeforces` o `py main.py atcoder`. |
+| `atcoder.py` | Recomienda AtCoder Beginner Contests recientes sin resolver por el grupo. |
+| `config.json` | Configuración local: usuarios, dificultades, URL del sheet, credenciales y config de AtCoder. |
 | `credentials.json` | Credenciales de Google Cloud. No subir a GitHub. |
-| `solved.txt` | Cache de problemas ya recomendados. |
-| `results.txt` | Resultado de la última generación. |
+| `solved.txt` | Cache de problemas ya recomendados (Codeforces). |
+| `results.txt` | Resultado de la última generación (Codeforces). |
+| `outputs/atcoder_links.txt` | Links de la última recomendación de AtCoder. |
 | `CONTEXT.md` | Contexto técnico para continuar el proyecto con un LLM. |
 
 ## Instalación
@@ -103,6 +106,32 @@ py fill_sheet.py
 - Fila `contest`.
 
 Nota: para el sheet principal se recomienda usar `fill_sheet.py`. `app.py` conserva una función de subida simple, pero esa salida no tiene la estructura completa por contests.
+
+### 3. Recomendar AtCoder Beginner Contests
+
+```powershell
+py main.py atcoder
+```
+
+Busca, entre los ABC más recientes (`lookback` en `config.json`), los que ningún usuario configurado haya tocado (ningún problema del contest resuelto), y recomienda hasta `count` de ellos. Imprime los links en terminal y los guarda en `outputs/atcoder_links.txt`.
+
+Configuración en `config.json`:
+
+```json
+"atcoder": {
+    "users": ["handle1", "handle2"],
+    "count": 5,
+    "lookback": 50,
+    "output_links": "outputs/atcoder_links.txt"
+}
+```
+
+- `users`: handles de **AtCoder** (no son necesariamente los mismos que los de Codeforces). Actualmente solo tiene un handle de prueba (`pacha2880`) — hay que completar la lista real del grupo.
+- `count`: cuántos contests recomendar.
+- `lookback`: cuántos ABC recientes considerar como candidatos.
+- `output_links`: ruta del archivo de salida con los links.
+
+También podés seguir usando `py main.py codeforces` como alias de `py app.py`.
 
 ## Configurar Google Sheets
 

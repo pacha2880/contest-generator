@@ -17,15 +17,14 @@ Tiene dos flujos principales:
 
 ### Repositorio
 
-La carpeta actual no está inicializada como repositorio Git. `git status` devuelve `fatal: not a git repository`.
-
-Antes de subir a GitHub conviene crear un `.gitignore` para excluir:
+La carpeta ya está inicializada como repositorio Git (rama `main`). `.gitignore` excluye:
 
 - `credentials.json`
 - `__pycache__/`
 - `.env`
 - `solved.txt`
 - `results.txt`
+- `outputs/`
 
 ### Verificación local
 
@@ -222,9 +221,18 @@ py -c "import requests; r=requests.get('https://codeforces.com/api/contest.list'
 
 ## Plan de implementación: recomendador AtCoder ABC
 
-Estado: plan escrito, implementación pendiente.
+Estado: implementado (2026-09-03). Ver `atcoder.py` y `main.py`.
 
-Objetivo: agregar un módulo simple para recomendar AtCoder Beginner Contests recientes en los que ninguno de los usuarios configurados haya resuelto ningún problema.
+`config.json["atcoder"]["users"]` tiene 4 handles reales confirmados (2026-09-03): `pacha2880` (256 AC), `DilanJCM8787` (208 AC), `AMAMEMIE` (123 AC), `pypyroxboy` (171 AC). Corresponden a un subconjunto de los 36 usuarios de Codeforces (`pacha2880`, `Dilan8787`→`DilanJCM8787`, `AMAMEMIE`, `PyroxBoy`→`pypyroxboy`), pero el handle de AtCoder no siempre coincide con el de Codeforces. Falta completar el resto del grupo (32 usuarios sin handle de AtCoder todavía).
+
+Decisiones tomadas al implementar:
+
+- `main.py` es un selector mínimo que no refactoriza `app.py`: `py main.py codeforces` simplemente importa y llama a `app.main()`; `py main.py atcoder` llama a `atcoder.main()`. `app.py` y `fill_sheet.py` siguen funcionando igual que antes, sin cambios.
+- La API de AtCoder Problems (`kenkoooo.com`) no pagina por índice sino por `from_second`; `atcoder.py` avanza `from_second` al último `epoch_second` + 1 hasta recibir un batch de menos de 500 resultados.
+- Un contest se recomienda solo si **ningún** problema del contest fue resuelto (AC) por **ningún** usuario configurado (contest "intacto"), igual que especifica el algoritmo original.
+- Probado end-to-end contra las APIs reales: con `lookback=50` y `count=5` devolvió abc473–abc469 (los 5 ABC más recientes al no haber overlap con el único usuario de prueba).
+
+Objetivo original: agregar un módulo simple para recomendar AtCoder Beginner Contests recientes en los que ninguno de los usuarios configurados haya resuelto ningún problema.
 
 Alcance inicial:
 
@@ -270,13 +278,13 @@ Algoritmo:
 12. Imprimir links en terminal.
 13. Guardar los mismos links en `outputs/atcoder_links.txt`.
 
-Archivos a crear/modificar:
+Archivos creados/modificados (completado):
 
-- Crear `atcoder.py`: lógica de descarga, filtrado y recomendación.
-- Crear `main.py`: selector simple entre `codeforces` y `atcoder`.
-- Actualizar `config.json`: agregar bloque `atcoder`.
-- Actualizar `README.md`: documentar uso básico de AtCoder.
-- Actualizar `CONTEXT.md`: marcar avances del plan.
+- ✅ `atcoder.py`: lógica de descarga, filtrado y recomendación.
+- ✅ `main.py`: selector simple entre `codeforces` y `atcoder`.
+- ✅ `config.json`: bloque `atcoder` agregado (con handle de prueba pendiente de completar).
+- ✅ `README.md`: uso básico de AtCoder documentado (sección "3. Recomendar AtCoder Beginner Contests").
+- ✅ `CONTEXT.md`: este archivo, actualizado.
 
 Comandos esperados:
 

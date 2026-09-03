@@ -8,6 +8,7 @@ venv/
 credentials.json
 solved.txt
 results.txt
+outputs/
 
 .DS_Store
 Thumbs.db
