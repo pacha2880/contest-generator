@@ -219,3 +219,75 @@ py -c "import requests; r=requests.get('https://codeforces.com/api/contest.list'
 - `fill_sheet.py` limpia y reescribe el sheet.
 - En Windows puede haber problemas de encoding en consola; los scripts ya usan configuración UTF-8 para stdout donde aplica.
 - Las credenciales pertenecen al proyecto Google Cloud `iron-rex-241415` y la cuenta de servicio `pacha-labs`.
+
+## Plan de implementación: recomendador AtCoder ABC
+
+Estado: plan escrito, implementación pendiente.
+
+Objetivo: agregar un módulo simple para recomendar AtCoder Beginner Contests recientes en los que ninguno de los usuarios configurados haya resuelto ningún problema.
+
+Alcance inicial:
+
+- Solo AtCoder Beginner Contests (`abc###`).
+- Sin CSV, sin Excel y sin Google Sheets.
+- Salida directa en terminal.
+- Archivo simple con links en `outputs/atcoder_links.txt`.
+- Configuración desde `config.json`.
+- Entrada principal con `main.py`, que pueda llamar a Codeforces o AtCoder.
+
+Configuración propuesta:
+
+```json
+{
+  "atcoder": {
+    "users": ["handle1", "handle2"],
+    "count": 5,
+    "lookback": 50,
+    "output_links": "outputs/atcoder_links.txt"
+  }
+}
+```
+
+Fuentes de datos:
+
+- Contests: `https://kenkoooo.com/atcoder/resources/contests.json`
+- Problemas por contest: `https://kenkoooo.com/atcoder/resources/contest-problem.json`
+- Submissions por usuario: `https://kenkoooo.com/atcoder/atcoder-api/v3/user/submissions?user={user}&from_second={from_second}`
+
+Algoritmo:
+
+1. Leer `config.json`.
+2. Obtener usuarios AtCoder desde `config["atcoder"]["users"]`.
+3. Descargar lista de contests.
+4. Filtrar contests cuyo id cumpla `abc\d+`.
+5. Ordenar por número descendente para priorizar los ABC más recientes.
+6. Tomar los primeros `lookback`.
+7. Descargar mapa de problemas por contest.
+8. Descargar submissions AC de cada usuario.
+9. Armar un set global de problemas resueltos por el grupo.
+10. Recomendar contests donde ningún problema del contest esté en ese set.
+11. Tomar los primeros `count`.
+12. Imprimir links en terminal.
+13. Guardar los mismos links en `outputs/atcoder_links.txt`.
+
+Archivos a crear/modificar:
+
+- Crear `atcoder.py`: lógica de descarga, filtrado y recomendación.
+- Crear `main.py`: selector simple entre `codeforces` y `atcoder`.
+- Actualizar `config.json`: agregar bloque `atcoder`.
+- Actualizar `README.md`: documentar uso básico de AtCoder.
+- Actualizar `CONTEXT.md`: marcar avances del plan.
+
+Comandos esperados:
+
+```powershell
+py main.py atcoder
+py main.py codeforces
+```
+
+Verificación:
+
+```powershell
+py -m py_compile main.py atcoder.py app.py
+py main.py atcoder
+```
