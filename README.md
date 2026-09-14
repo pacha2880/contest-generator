@@ -47,14 +47,14 @@ El archivo `config.json` tiene esta forma:
 
 ```json
 {
-    "users": ["handle1", "handle2"],
+    "users_codeforces": ["handle1", "handle2"],
     "difficulties": ["1900", "1900", "1800", "1700", "1700", "1300", "1300", "900", "900", "800"],
     "sheets_url": "https://docs.google.com/spreadsheets/d/ID/edit",
     "credentials_file": "credentials.json"
 }
 ```
 
-- `users`: handles de Codeforces del grupo.
+- `users_codeforces`: handles de Codeforces del grupo. Los usa `app.py`, `generate_contest.py` y `fill_sheet.py`.
 - `difficulties`: lista con repeticiones. Cada ocurrencia pide un problema de esa dificultad.
 - `sheets_url`: URL completa de la Google Sheet.
 - `credentials_file`: ruta al JSON de la cuenta de servicio de Google Cloud.
@@ -139,7 +139,7 @@ También podés seguir usando `py main.py codeforces` como alias de `py app.py`.
 py main.py gym
 ```
 
-Busca, entre los gyms de Codeforces que cumplen los filtros configurados, los que ningún usuario de `config.json["users"]` haya tocado (ni resuelto ni intentado ningún problema), ordenados de más reciente a más antiguo. Sobre la lista final recomendada revisa además si cada gym tiene tutorial/editorial en "Contest materials". Imprime en terminal id, estrellas de dificultad, si tiene tutorial y el link; guarda los links en `outputs/gym_links.txt`.
+Busca, entre los gyms de Codeforces que cumplen los filtros configurados, los que ningún usuario de `config.json["users_gym"]` haya tocado (ni resuelto ni intentado ningún problema), ordenados de más reciente a más antiguo. Sobre la lista final recomendada revisa además si cada gym tiene tutorial/editorial en "Contest materials". Imprime en terminal id, estrellas de dificultad, si tiene tutorial y el link; guarda los links en `outputs/gym_links.txt`.
 
 Configuración en `config.json`:
 
@@ -170,7 +170,7 @@ Configuración en `config.json`:
 - `filters.season_from` / `filters.season_to`: rango de temporada (ej. `"2015-2016"`), o `null`.
 - `output_links`: ruta del archivo de salida con los links.
 
-Cualquier filtro en `null` no restringe nada. Usa los mismos handles de Codeforces que `config.json["users"]` (los gyms viven en Codeforces).
+Cualquier filtro en `null` no restringe nada. `users_gym` es una lista de handles de Codeforces separada de `users_codeforces` (los gyms viven en Codeforces, pero puede interesar probarlo con un subconjunto del grupo, o con handles distintos, sin afectar `app.py`/`fill_sheet.py`).
 
 Nota sobre el chequeo de tutorial/editorial: scrapea `codeforces.com/gym/{id}` con `curl` (no con la librería `requests` de Python, que Cloudflare bloquea por su fingerprint TLS) y reutiliza cookies entre pedidos para no disparar el challenge anti-bot. Si algún pedido puntual queda bloqueado igual, se muestra como "couldn't check" en vez de asumir que no tiene tutorial.
 

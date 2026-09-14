@@ -1,5 +1,5 @@
 {
-    "users": [
+    "users_codeforces": [
         "__profeta",
         "Simurdiera_MAC",
         "Alexander1755",
@@ -97,6 +97,12 @@
         "lookback": 50,
         "output_links": "outputs/atcoder_links.txt"
     },
+    "users_gym": [
+        "nicolasalba",
+        "__profeta",
+        "Simurdiera_MAC",
+        "Alexander1755"
+    ],
     "gym": {
         "count": 10,
         "filters": {

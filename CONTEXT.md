@@ -38,7 +38,7 @@ En esta máquina el comando `python` no está disponible; se usa `py`.
 
 ### Usuarios activos
 
-El archivo `config.json` tiene actualmente 36 handles:
+El archivo `config.json["users_codeforces"]` tiene actualmente 36 handles (usados por `app.py`, `generate_contest.py` y `fill_sheet.py`):
 
 `__profeta`, `Simurdiera_MAC`, `Alexander1755`, `Karenn`, `Andres_Espada`, `Max241`, `HeReWeGoAgAiN123`, `Oliver_Pozo_Flores`, `OPF10`, `pacha2880`, `NeverSayF`, `alexalvarez123`, `The_Lion_King_777`, `candi_ositos`, `zoryn`, `Gabriel___`, `PyroxBoy`, `pharaoh583`, `ErlandMB`, `romerproblem`, `Dilan8787`, `pablo-acha`, `eeliezercm2`, `jim_games`, `alvmaury1`, `MCMT17`, `mortyseb`, `camilo_zuleta`, `Osvaldo34`, `samuellr`, `grxchx`, `alabrito4007`, `srllamadev`, `AMAMEMIE`, `Mr_chuby`, `Zeincho`
 
@@ -322,7 +322,7 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 ### Decisiones de diseño
 
 - `main.py` gana un tercer modo: `py main.py gym`, mismo patrón que `atcoder.py` — no toca `app.py`/`fill_sheet.py`.
-- Reusa `config.json["users"]` (36 handles de Codeforces) en vez de una lista nueva, porque los gyms viven en Codeforces — mismos handles que ya tenemos.
+- Usa `config.json["users_gym"]`, una lista separada de `users_codeforces` (2026-09-14, a pedido del usuario) — por defecto tiene solo 4 handles de prueba (`nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755`), no los 36 del grupo completo. Permite probar el módulo sin las ~36 llamadas a `user.status` que tardan minutos, y sin acoplar el flujo de gyms al de Codeforces/Sheets.
 - "Hide, if participated" de la UI de CF **no se replica aparte**: nuestro paso de exclusión (gym tocado por cualquier usuario del grupo, no solo la cuenta logueada) ya es una versión más fuerte de ese filtro.
 - "Hide excluded gyms" (lista de exclusión manual guardada en la cuenta de CF) se descarta — no es información pública vía API y el usuario confirmó que no importa para este caso de uso.
 - Chequeo de tutorial/editorial va **al final**, no como filtro de selección: primero se arma la lista final de recomendados (post-filtro de metadata, post-exclusión por grupo, ordenados por más recientes, top `count`), y recién sobre esa lista corta (no sobre todo el pool filtrado) se scrapea cada página con regex `(?i)tutorial|editorial` sobre el texto de los links de "Contest materials". Solo informa, no descarta gyms.
@@ -354,7 +354,7 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 
 ### Algoritmo
 
-1. Leer `config.json`: usuarios (`config["users"]`), filtros de `config["gym"]["filters"]`, `count`, `output_links`.
+1. Leer `config.json`: usuarios (`config["users_gym"]`), filtros de `config["gym"]["filters"]`, `count`, `output_links`.
 2. Descargar `contest.list?gym=true` (una sola vez, 2630 gyms).
 3. Filtrar candidatos por metadata: `type`, `kind`, `icpc_region`, `difficulty_min/max`, `duration_min/max`, `season_from/to`.
 4. Para cada usuario del grupo, `user.status(handle, count=10000)` y quedarse con el set de `contestId` dentro del rango de IDs de gym (cualquier verdict). Unir en un set global `touched_gyms`.
@@ -373,7 +373,7 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 - ✅ `README.md`: uso documentado (sección "4. Recomendar gyms de Codeforces").
 - ✅ `CONTEXT.md`: este archivo, actualizado.
 
-Probado end-to-end (2026-09-14) con los handles `nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755` (sin tocar el `config.json["users"]` real de 36 — se pasaron directo a `find_recommended_gyms()`): 447/2630 gyms cumplían los filtros por defecto, el grupo de prueba había tocado 222, y la recomendación final de 10 gyms incluyó una mezcla real de con/sin tutorial (confirmado manualmente contra el HTML, no todo "encontrado" como en el primer intento con los bugs sin corregir).
+Probado end-to-end (2026-09-14) con los handles `nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755`: 447/2630 gyms cumplían los filtros por defecto, ese grupo había tocado 222, y la recomendación final de 10 gyms incluyó una mezcla real de con/sin tutorial (confirmado manualmente contra el HTML, no todo "encontrado" como en el primer intento con los bugs sin corregir). Primero se probó pasando esos handles directo a `find_recommended_gyms()` sin tocar el config; luego, al separar `users_codeforces`/`users_gym`, se corrió `py main.py gym` real con esos mismos 4 handles ya en `config.json["users_gym"]` y dio el mismo resultado.
 
 Comando esperado:
 

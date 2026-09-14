@@ -134,7 +134,7 @@ def upload_to_sheets(all_results, sheets_url, creds_file):
 
 def main():
     cfg = load_config()
-    users = cfg.get("users", [])
+    users = cfg.get("users_codeforces", [])
     diff_list = cfg.get("difficulties", [])
     sheets_url = cfg.get("sheets_url", "")
     creds_file = cfg.get("credentials_file", "credentials.json")

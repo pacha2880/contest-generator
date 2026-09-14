@@ -126,7 +126,7 @@ def find_one(problems, stats, rating, user_solved, banned):
 def main():
     with open("config.json") as f:
         cfg = json.load(f)
-    users = cfg.get("users", [])
+    users = cfg.get("users_codeforces", [])
 
     print("=== Loading banned problems ===")
     banned = load_banned()

@@ -163,13 +163,13 @@ def check_editorials(recommended):
 def main():
     cfg = load_config()
     gym_cfg = cfg.get("gym", {})
-    users = cfg.get("users", [])
+    users = cfg.get("users_gym", [])
     filters = gym_cfg.get("filters", {})
     count = gym_cfg.get("count", 10)
     output_path = gym_cfg.get("output_links", "outputs/gym_links.txt")
 
     if not users:
-        print("No hay usuarios configurados en config.json['users'].")
+        print("No hay usuarios configurados en config.json['users_gym'].")
         return
 
     print(f"Users ({len(users)}): {', '.join(users)}")
