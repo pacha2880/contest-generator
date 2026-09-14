@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 import re
@@ -166,7 +167,7 @@ def main():
     users = cfg.get("users_gym", [])
     filters = gym_cfg.get("filters", {})
     count = gym_cfg.get("count", 10)
-    output_path = gym_cfg.get("output_links", "outputs/gym_links.txt")
+    output_path = gym_cfg.get("output_csv", "outputs/gym_recommendations.csv")
 
     if not users:
         print("No hay usuarios configurados en config.json['users_gym'].")
@@ -182,27 +183,34 @@ def main():
     editorials = check_editorials(recommended)
 
     print(f"\n=== Recommended gyms ({len(recommended)}/{count}) ===")
-    links = []
+    rows = []
     for contest in recommended:
         link = f"https://codeforces.com/gym/{contest['id']}"
-        links.append(link)
         found = editorials.get(contest["id"])
         if found is True:
-            note = "tutorial/editorial found"
+            editorial = "yes"
         elif found is False:
-            note = "no tutorial/editorial"
+            editorial = "no"
         else:
-            note = "couldn't check (page fetch blocked)"
-        print(f"  {stars(contest.get('difficulty'))}  {contest['id']}  |  {contest['name']}  |  {note}  |  {link}")
+            editorial = "unknown (page fetch blocked)"
+        rows.append({
+            "id": contest["id"],
+            "name": contest["name"],
+            "difficulty": contest.get("difficulty", ""),
+            "editorial": editorial,
+            "link": link,
+        })
+        print(f"  {stars(contest.get('difficulty'))}  {contest['id']}  |  {contest['name']}  |  editorial: {editorial}  |  {link}")
 
     out_dir = os.path.dirname(output_path)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
-        for link in links:
-            f.write(link + "\n")
+    with open(output_path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["id", "name", "difficulty", "editorial", "link"])
+        writer.writeheader()
+        writer.writerows(rows)
 
-    print(f"\nSaved {len(links)} links to {output_path}")
+    print(f"\nSaved {len(rows)} rows to {output_path}")
 
 
 if __name__ == "__main__":

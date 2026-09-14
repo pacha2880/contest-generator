@@ -139,7 +139,7 @@ También podés seguir usando `py main.py codeforces` como alias de `py app.py`.
 py main.py gym
 ```
 
-Busca, entre los gyms de Codeforces que cumplen los filtros configurados, los que ningún usuario de `config.json["users_gym"]` haya tocado (ni resuelto ni intentado ningún problema), ordenados de más reciente a más antiguo. Sobre la lista final recomendada revisa además si cada gym tiene tutorial/editorial en "Contest materials". Imprime en terminal id, estrellas de dificultad, si tiene tutorial y el link; guarda los links en `outputs/gym_links.txt`.
+Busca, entre los gyms de Codeforces que cumplen los filtros configurados, los que ningún usuario de `config.json["users_gym"]` haya tocado (ni resuelto ni intentado ningún problema), ordenados de más reciente a más antiguo. Sobre la lista final recomendada revisa además si cada gym tiene tutorial/editorial en "Contest materials". Imprime en terminal id, estrellas de dificultad, si tiene tutorial y el link; guarda una fila por gym (id, nombre, dificultad, editorial, link) en `outputs/gym_recommendations.csv`.
 
 Configuración en `config.json`:
 
@@ -157,7 +157,7 @@ Configuración en `config.json`:
         "season_from": null,
         "season_to": null
     },
-    "output_links": "outputs/gym_links.txt"
+    "output_csv": "outputs/gym_recommendations.csv"
 }
 ```
 
@@ -168,7 +168,7 @@ Configuración en `config.json`:
 - `filters.difficulty_min` / `filters.difficulty_max`: estrellas de dificultad, 1 a 5.
 - `filters.duration_min_seconds` / `filters.duration_max_seconds`: duración del contest en segundos (por defecto 18000 = 5 horas).
 - `filters.season_from` / `filters.season_to`: rango de temporada (ej. `"2015-2016"`), o `null`.
-- `output_links`: ruta del archivo de salida con los links.
+- `output_csv`: ruta del CSV de salida, con columnas `id,name,difficulty,editorial,link` (`editorial` es `yes`/`no`/`unknown (page fetch blocked)`).
 
 Cualquier filtro en `null` no restringe nada. `users_gym` es una lista de handles de Codeforces separada de `users_codeforces` (los gyms viven en Codeforces, pero puede interesar probarlo con un subconjunto del grupo, o con handles distintos, sin afectar `app.py`/`fill_sheet.py`).
 

@@ -110,12 +110,12 @@
             "kind": ["Official ICPC Contest"],
             "icpc_region": null,
             "difficulty_min": 3,
-            "difficulty_max": 4,
+            "difficulty_max": 3,
             "duration_min_seconds": 18000,
             "duration_max_seconds": 18000,
             "season_from": null,
             "season_to": null
         },
-        "output_links": "outputs/gym_links.txt"
+        "output_csv": "outputs/gym_recommendations.csv"
     }
 }

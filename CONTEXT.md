@@ -347,14 +347,14 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
       "season_from": null,
       "season_to": null
     },
-    "output_links": "outputs/gym_links.txt"
+    "output_csv": "outputs/gym_recommendations.csv"
   }
 }
 ```
 
 ### Algoritmo
 
-1. Leer `config.json`: usuarios (`config["users_gym"]`), filtros de `config["gym"]["filters"]`, `count`, `output_links`.
+1. Leer `config.json`: usuarios (`config["users_gym"]`), filtros de `config["gym"]["filters"]`, `count`, `output_csv`.
 2. Descargar `contest.list?gym=true` (una sola vez, 2630 gyms).
 3. Filtrar candidatos por metadata: `type`, `kind`, `icpc_region`, `difficulty_min/max`, `duration_min/max`, `season_from/to`.
 4. Para cada usuario del grupo, `user.status(handle, count=10000)` y quedarse con el set de `contestId` dentro del rango de IDs de gym (cualquier verdict). Unir en un set global `touched_gyms`.
@@ -363,7 +363,7 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 7. Tomar los primeros `count` → esta es la lista final de recomendados.
 8. Sobre esa lista corta (no antes), scrapear `codeforces.com/gym/{id}` con `curl` (no `requests`, ver bugs arriba) reutilizando una cookie jar temporal y ~0.9s de delay entre requests; buscar el bloque "Contest materials" acotado por `MATERIALS_RE` y matchear `tutorial|editorial` dentro de ese bloque.
 9. Imprimir en terminal cada recomendado: id, nombre, estrellas (`difficulty`), link, y si tiene tutorial/editorial, no tiene, o no se pudo verificar.
-10. Guardar los links (solo URLs, un por línea) en `outputs/gym_links.txt`.
+10. Guardar en `outputs/gym_recommendations.csv` una fila por gym con columnas `id,name,difficulty,editorial,link` (`editorial` es `yes`/`no`/`unknown (page fetch blocked)`). Cambiado de un archivo de solo links a CSV (2026-09-14) porque el usuario pidió ver también dificultad y estado de editorial en el archivo, no solo en terminal.
 
 ### Archivos creados/modificados (completado)
 
