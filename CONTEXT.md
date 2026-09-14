@@ -325,7 +325,8 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 - Usa `config.json["users_gym"]`, una lista separada de `users_codeforces` (2026-09-14, a pedido del usuario) — por defecto tiene solo 4 handles de prueba (`nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755`), no los 36 del grupo completo. Permite probar el módulo sin las ~36 llamadas a `user.status` que tardan minutos, y sin acoplar el flujo de gyms al de Codeforces/Sheets.
 - "Hide, if participated" de la UI de CF **no se replica aparte**: nuestro paso de exclusión (gym tocado por cualquier usuario del grupo, no solo la cuenta logueada) ya es una versión más fuerte de ese filtro.
 - "Hide excluded gyms" (lista de exclusión manual guardada en la cuenta de CF) se descarta — no es información pública vía API y el usuario confirmó que no importa para este caso de uso.
-- Chequeo de tutorial/editorial va **al final**, no como filtro de selección: primero se arma la lista final de recomendados (post-filtro de metadata, post-exclusión por grupo, ordenados por más recientes, top `count`), y recién sobre esa lista corta (no sobre todo el pool filtrado) se scrapea cada página con regex `(?i)tutorial|editorial` sobre el texto de los links de "Contest materials". Solo informa, no descarta gyms.
+- Chequeo de tutorial/editorial va **al final** por defecto, no como filtro de selección: primero se arma la lista final de recomendados (post-filtro de metadata, post-exclusión por grupo, ordenados por más recientes, top `count`), y recién sobre esa lista corta se scrapea cada página. Solo informa, no descarta gyms.
+- `require_editorial: true` (agregado 2026-09-14) cambia ese orden: en vez de chequear editorial solo sobre el top `count`, camina la lista completa de candidatos (de más reciente a más antiguo) chequeando editorial uno por uno y quedándose solo con los que sí tienen, hasta juntar `count` o agotar candidatos. Si un gym no tiene editorial o el fetch queda bloqueado, se salta (no cuenta como hallazgo) y sigue con el siguiente — nunca rellena con gyms sin editorial confirmado. Probado con los 4 handles de prueba y `difficulty_max: 3`: encontró 8/10 (se agotaron los candidatos con editorial entre los no tocados por ese grupo de prueba), mostrando el conteo real en vez de fingir 10/10.
 - Al mostrar cada gym recomendado en terminal: id, nombre, estrellas de dificultad, link, y si se encontró tutorial/editorial o no.
 - `duration_min_seconds`/`duration_max_seconds` por defecto en `18000` (5 horas), matcheando el filtro por defecto que se ve en la UI de CF ("Duration: from 5 to 5").
 - `count` por defecto `10` (no 5 como AtCoder).
@@ -336,6 +337,7 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 {
   "gym": {
     "count": 10,
+    "require_editorial": false,
     "filters": {
       "type": "ICPC",
       "kind": ["Official ICPC Contest"],
@@ -360,8 +362,8 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 4. Para cada usuario del grupo, `user.status(handle, count=10000)` y quedarse con el set de `contestId` dentro del rango de IDs de gym (cualquier verdict). Unir en un set global `touched_gyms`.
 5. Excluir de los candidatos filtrados cualquier gym cuyo `id` esté en `touched_gyms`.
 6. Ordenar los restantes por `startTimeSeconds` descendente (los que no lo tienen, al final) — más recientes primero.
-7. Tomar los primeros `count` → esta es la lista final de recomendados.
-8. Sobre esa lista corta (no antes), scrapear `codeforces.com/gym/{id}` con `curl` (no `requests`, ver bugs arriba) reutilizando una cookie jar temporal y ~0.9s de delay entre requests; buscar el bloque "Contest materials" acotado por `MATERIALS_RE` y matchear `tutorial|editorial` dentro de ese bloque.
+7. Sin `require_editorial`: tomar los primeros `count` → lista final de recomendados; con `require_editorial`: caminar la lista completa de candidatos chequeando editorial en cada uno hasta juntar `count` con editorial confirmado (ver `select_recommendations()`).
+8. El chequeo de editorial scrapea `codeforces.com/gym/{id}` con `curl` (no `requests`, ver bugs arriba) reutilizando una cookie jar temporal y ~0.9s de delay entre requests; busca el bloque "Contest materials" acotado por `MATERIALS_RE` y matchea `tutorial|editorial` dentro de ese bloque.
 9. Imprimir en terminal cada recomendado: id, nombre, estrellas (`difficulty`), link, y si tiene tutorial/editorial, no tiene, o no se pudo verificar.
 10. Guardar en `outputs/gym_recommendations.csv` una fila por gym con columnas `id,name,difficulty,editorial,link` (`editorial` es `yes`/`no`/`unknown (page fetch blocked)`). Cambiado de un archivo de solo links a CSV (2026-09-14) porque el usuario pidió ver también dificultad y estado de editorial en el archivo, no solo en terminal.
 

@@ -106,7 +106,9 @@ def fetch_user_touched_gyms(user):
     return touched
 
 
-def find_recommended_gyms(users, filters, count):
+def find_untouched_gyms(users, filters):
+    """All gyms matching the metadata filters that no user has touched,
+    sorted most recent first. Not yet trimmed to `count`."""
     contests = fetch_gym_contests()
     candidates = [c for c in contests if matches_filters(c, filters)]
     print(f"{len(candidates)}/{len(contests)} gyms match the configured filters\n")
@@ -119,7 +121,7 @@ def find_recommended_gyms(users, filters, count):
 
     untouched = [c for c in candidates if c["id"] not in touched]
     untouched.sort(key=lambda c: c.get("startTimeSeconds", 0), reverse=True)
-    return untouched[:count]
+    return untouched
 
 
 def stars(difficulty):
@@ -161,12 +163,42 @@ def check_editorials(recommended):
     return editorials
 
 
+def select_recommendations(untouched, count, require_editorial):
+    """Without require_editorial, just takes the top `count` and checks their
+    editorial status afterwards for display only (current behavior).
+
+    With require_editorial, the editorial check has to run *during* selection
+    instead: walk the sorted candidates from most recent, checking each one as
+    we go, and only keep it if it actually has one — skipping past gyms
+    without an editorial (or whose page fetch got blocked) until `count` is
+    reached or candidates run out."""
+    if not require_editorial:
+        recommended = untouched[:count]
+        editorials = check_editorials(recommended)
+        return recommended, editorials
+
+    recommended = []
+    editorials = {}
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        cookie_jar = os.path.join(tmp_dir, "cf_cookies.txt")
+        for contest in untouched:
+            if len(recommended) >= count:
+                break
+            found = has_editorial(contest["id"], cookie_jar)
+            time.sleep(0.9)
+            if found:
+                recommended.append(contest)
+                editorials[contest["id"]] = found
+    return recommended, editorials
+
+
 def main():
     cfg = load_config()
     gym_cfg = cfg.get("gym", {})
     users = cfg.get("users_gym", [])
     filters = gym_cfg.get("filters", {})
     count = gym_cfg.get("count", 10)
+    require_editorial = gym_cfg.get("require_editorial", False)
     output_path = gym_cfg.get("output_csv", "outputs/gym_recommendations.csv")
 
     if not users:
@@ -175,12 +207,15 @@ def main():
 
     print(f"Users ({len(users)}): {', '.join(users)}")
     print(f"Filters: {filters}")
-    print(f"Recommending up to {count} gyms.\n")
+    if require_editorial:
+        print(f"Recommending up to {count} gyms that have a tutorial/editorial.\n")
+    else:
+        print(f"Recommending up to {count} gyms.\n")
 
-    recommended = find_recommended_gyms(users, filters, count)
+    untouched = find_untouched_gyms(users, filters)
 
-    print(f"=== Checking contest materials for {len(recommended)} recommended gyms ===")
-    editorials = check_editorials(recommended)
+    print(f"=== Checking contest materials ({'required' if require_editorial else 'informational'}) ===")
+    recommended, editorials = select_recommendations(untouched, count, require_editorial)
 
     print(f"\n=== Recommended gyms ({len(recommended)}/{count}) ===")
     rows = []

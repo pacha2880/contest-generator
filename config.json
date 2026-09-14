@@ -105,6 +105,7 @@
     ],
     "gym": {
         "count": 10,
+        "require_editorial": false,
         "filters": {
             "type": "ICPC",
             "kind": ["Official ICPC Contest"],

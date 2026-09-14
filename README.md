@@ -146,6 +146,7 @@ Configuración en `config.json`:
 ```json
 "gym": {
     "count": 10,
+    "require_editorial": false,
     "filters": {
         "type": "ICPC",
         "kind": ["Official ICPC Contest"],
@@ -162,6 +163,7 @@ Configuración en `config.json`:
 ```
 
 - `count`: cuántos gyms recomendar (por defecto 10).
+- `require_editorial`: si es `true`, solo recomienda gyms que efectivamente tengan tutorial/editorial en "Contest materials" — sigue buscando más abajo en la lista (más antiguos) hasta juntar `count` o agotar los candidatos. Si es `false` (default), recomienda los `count` más recientes sin filtrar por esto, y el chequeo de editorial queda solo informativo en el output.
 - `filters.type`: formato del contest, `"ICPC"` o `"IOI"` (o `null` para no filtrar).
 - `filters.kind`: lista de tipos de contest aceptados (ej. `"Official ICPC Contest"`, `"Training Contest"`, `"Official School Contest"`), o `null` para cualquiera.
 - `filters.icpc_region`: región ICPC exacta (ej. `"Northeastern Europe Region"`), o `null`.
