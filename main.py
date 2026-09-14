@@ -3,7 +3,7 @@ import sys
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: py main.py [codeforces|atcoder]")
+        print("Usage: py main.py [codeforces|atcoder|gym]")
         sys.exit(1)
 
     mode = sys.argv[1]
@@ -13,9 +13,12 @@ def main():
     elif mode == "atcoder":
         import atcoder
         atcoder.main()
+    elif mode == "gym":
+        import gym
+        gym.main()
     else:
         print(f"Unknown mode: {mode}")
-        print("Usage: py main.py [codeforces|atcoder]")
+        print("Usage: py main.py [codeforces|atcoder|gym]")
         sys.exit(1)
 
 

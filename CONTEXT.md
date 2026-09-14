@@ -299,3 +299,84 @@ Verificación:
 py -m py_compile main.py atcoder.py app.py
 py main.py atcoder
 ```
+
+## Plan de implementación: recomendador de gyms de Codeforces
+
+Estado: implementado (2026-09-14). Ver `gym.py` y `main.py`.
+
+Objetivo: agregar un módulo que recomiende gyms de Codeforces recientes donde ningún usuario del grupo haya resuelto ni intentado ningún problema, con filtros equivalentes a los del "Training filter" de la web de CF (season, contest type, contest format, ICPC region, duration, difficulty).
+
+### Investigación hecha antes de escribir el plan
+
+- `GET https://codeforces.com/api/contest.list?gym=true` (sin auth) devuelve los **2630 gyms existentes**, cada uno con `id`, `name`, `type` (ICPC/IOI), `kind` (Official ICPC Contest, Training Contest, Official School Contest, School/University/City/Region Championship, Official International Personal Contest, Training Camp Contest, Opencup Contest), `icpcRegion` (solo 410/2630 lo tienen), `difficulty` (1-5), `season`, `durationSeconds`, `startTimeSeconds` (no todos lo tienen). Estos campos cubren **todos** los filtros de la UI sin scrapear HTML.
+- `contest.standings` para un gym **requiere autenticación** (`apiKey`/`apiSecret`) — probado, falla con "You have to be authenticated". Por eso NO se usa para saber los problemas del gym.
+- No hace falta de todas formas: `user.status(handle)` (sin auth, mismo endpoint que ya usa `app.py`) **incluye los envíos a gyms** dentro del historial normal — cada submission trae `contestId`, y los IDs de gym están todos en el rango `100001–106707` (no se pisan nunca con contests normales, que van hasta ~3000). Confirmado con la cuenta `pacha2880`: de 7621 envíos, 2508 eran de gyms. Con eso alcanza para saber si un usuario "tocó" un gym (cualquier verdict, no solo AC) sin necesitar la lista de problemas del gym ni auth.
+- La página `codeforces.com/gym/{id}` es HTML renderizado en servidor; el bloque "Contest materials" (Statements/Tutorial/Editorial) ya viene en el HTML inicial, sin login ni JS. **Cuidado con Cloudflare**: pegar muchos requests seguidos sin mantener cookies de sesión dispara un challenge ("Just a moment...") en vez de la página real (pasó con 8 requests seguidos a 0.3s de delay). Solución: reusar cookies entre requests + ~0.8-1s de delay.
+
+Dos bugs encontrados y corregidos durante la implementación (2026-09-14), documentados porque no son obvios:
+
+- **`requests` de Python queda bloqueado por Cloudflare (403), `curl` no.** Se probó en paralelo contra la misma URL: `requests.Session().get(...)` devolvía 403 "Just a moment..." aun con cookies y delay, mientras `curl` con los mismos parámetros devolvía 200 con el HTML real. Es un bloqueo por fingerprint TLS/HTTP, no por rate limit ni User-Agent. Por eso `has_editorial()` en `gym.py` shellea a `curl` vía `subprocess` en vez de usar `requests` (que sí se usa sin problema para las llamadas a la API de Codeforces — este bloqueo es específico de las páginas HTML del gym, protegidas por Cloudflare de forma distinta a la API).
+- **Toda página de gym tiene `Codeforces.setupTutorials("/data/problemTutorial")` en un `<script>` cerca del principio del HTML** — es un setup genérico para el popup de tutorial por problema resuelto, no tiene nada que ver con el sidebar "Contest materials". Buscar `tutorial|editorial` contra el HTML completo da falso positivo en el 100% de los gyms. Hay que acotar la búsqueda al bloque del sidebar, delimitado por el texto "Contest materials" y el siguiente "second-level-menu" (la barra de tabs Problems/Submit/Standings que siempre sigue al sidebar). Ver `MATERIALS_RE` en `gym.py`.
+- Efecto colateral de estos dos bugs: si el fetch de una página puntual queda bloqueado por Cloudflare, `has_editorial()` devuelve `None` (no `False`), y el output distingue "no tutorial/editorial" (verificado, no tiene) de "couldn't check (page fetch blocked)" (no se pudo verificar) — para no reportar falsos negativos como si fueran datos confirmados.
+
+### Decisiones de diseño
+
+- `main.py` gana un tercer modo: `py main.py gym`, mismo patrón que `atcoder.py` — no toca `app.py`/`fill_sheet.py`.
+- Reusa `config.json["users"]` (36 handles de Codeforces) en vez de una lista nueva, porque los gyms viven en Codeforces — mismos handles que ya tenemos.
+- "Hide, if participated" de la UI de CF **no se replica aparte**: nuestro paso de exclusión (gym tocado por cualquier usuario del grupo, no solo la cuenta logueada) ya es una versión más fuerte de ese filtro.
+- "Hide excluded gyms" (lista de exclusión manual guardada en la cuenta de CF) se descarta — no es información pública vía API y el usuario confirmó que no importa para este caso de uso.
+- Chequeo de tutorial/editorial va **al final**, no como filtro de selección: primero se arma la lista final de recomendados (post-filtro de metadata, post-exclusión por grupo, ordenados por más recientes, top `count`), y recién sobre esa lista corta (no sobre todo el pool filtrado) se scrapea cada página con regex `(?i)tutorial|editorial` sobre el texto de los links de "Contest materials". Solo informa, no descarta gyms.
+- Al mostrar cada gym recomendado en terminal: id, nombre, estrellas de dificultad, link, y si se encontró tutorial/editorial o no.
+- `duration_min_seconds`/`duration_max_seconds` por defecto en `18000` (5 horas), matcheando el filtro por defecto que se ve en la UI de CF ("Duration: from 5 to 5").
+- `count` por defecto `10` (no 5 como AtCoder).
+
+### Configuración propuesta
+
+```json
+{
+  "gym": {
+    "count": 10,
+    "filters": {
+      "type": "ICPC",
+      "kind": ["Official ICPC Contest"],
+      "icpc_region": null,
+      "difficulty_min": 3,
+      "difficulty_max": 4,
+      "duration_min_seconds": 18000,
+      "duration_max_seconds": 18000,
+      "season_from": null,
+      "season_to": null
+    },
+    "output_links": "outputs/gym_links.txt"
+  }
+}
+```
+
+### Algoritmo
+
+1. Leer `config.json`: usuarios (`config["users"]`), filtros de `config["gym"]["filters"]`, `count`, `output_links`.
+2. Descargar `contest.list?gym=true` (una sola vez, 2630 gyms).
+3. Filtrar candidatos por metadata: `type`, `kind`, `icpc_region`, `difficulty_min/max`, `duration_min/max`, `season_from/to`.
+4. Para cada usuario del grupo, `user.status(handle, count=10000)` y quedarse con el set de `contestId` dentro del rango de IDs de gym (cualquier verdict). Unir en un set global `touched_gyms`.
+5. Excluir de los candidatos filtrados cualquier gym cuyo `id` esté en `touched_gyms`.
+6. Ordenar los restantes por `startTimeSeconds` descendente (los que no lo tienen, al final) — más recientes primero.
+7. Tomar los primeros `count` → esta es la lista final de recomendados.
+8. Sobre esa lista corta (no antes), scrapear `codeforces.com/gym/{id}` con `curl` (no `requests`, ver bugs arriba) reutilizando una cookie jar temporal y ~0.9s de delay entre requests; buscar el bloque "Contest materials" acotado por `MATERIALS_RE` y matchear `tutorial|editorial` dentro de ese bloque.
+9. Imprimir en terminal cada recomendado: id, nombre, estrellas (`difficulty`), link, y si tiene tutorial/editorial, no tiene, o no se pudo verificar.
+10. Guardar los links (solo URLs, un por línea) en `outputs/gym_links.txt`.
+
+### Archivos creados/modificados (completado)
+
+- ✅ `gym.py`: lógica de descarga, filtrado, exclusión por grupo y chequeo de editorial.
+- ✅ `main.py`: modo `gym` agregado.
+- ✅ `config.json`: bloque `gym` agregado con los valores por defecto del plan.
+- ✅ `README.md`: uso documentado (sección "4. Recomendar gyms de Codeforces").
+- ✅ `CONTEXT.md`: este archivo, actualizado.
+
+Probado end-to-end (2026-09-14) con los handles `nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755` (sin tocar el `config.json["users"]` real de 36 — se pasaron directo a `find_recommended_gyms()`): 447/2630 gyms cumplían los filtros por defecto, el grupo de prueba había tocado 222, y la recomendación final de 10 gyms incluyó una mezcla real de con/sin tutorial (confirmado manualmente contra el HTML, no todo "encontrado" como en el primer intento con los bugs sin corregir).
+
+Comando esperado:
+
+```powershell
+py main.py gym
+```

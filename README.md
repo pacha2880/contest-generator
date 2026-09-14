@@ -133,6 +133,47 @@ Configuración en `config.json`:
 
 También podés seguir usando `py main.py codeforces` como alias de `py app.py`.
 
+### 4. Recomendar gyms de Codeforces
+
+```powershell
+py main.py gym
+```
+
+Busca, entre los gyms de Codeforces que cumplen los filtros configurados, los que ningún usuario de `config.json["users"]` haya tocado (ni resuelto ni intentado ningún problema), ordenados de más reciente a más antiguo. Sobre la lista final recomendada revisa además si cada gym tiene tutorial/editorial en "Contest materials". Imprime en terminal id, estrellas de dificultad, si tiene tutorial y el link; guarda los links en `outputs/gym_links.txt`.
+
+Configuración en `config.json`:
+
+```json
+"gym": {
+    "count": 10,
+    "filters": {
+        "type": "ICPC",
+        "kind": ["Official ICPC Contest"],
+        "icpc_region": null,
+        "difficulty_min": 3,
+        "difficulty_max": 4,
+        "duration_min_seconds": 18000,
+        "duration_max_seconds": 18000,
+        "season_from": null,
+        "season_to": null
+    },
+    "output_links": "outputs/gym_links.txt"
+}
+```
+
+- `count`: cuántos gyms recomendar (por defecto 10).
+- `filters.type`: formato del contest, `"ICPC"` o `"IOI"` (o `null` para no filtrar).
+- `filters.kind`: lista de tipos de contest aceptados (ej. `"Official ICPC Contest"`, `"Training Contest"`, `"Official School Contest"`), o `null` para cualquiera.
+- `filters.icpc_region`: región ICPC exacta (ej. `"Northeastern Europe Region"`), o `null`.
+- `filters.difficulty_min` / `filters.difficulty_max`: estrellas de dificultad, 1 a 5.
+- `filters.duration_min_seconds` / `filters.duration_max_seconds`: duración del contest en segundos (por defecto 18000 = 5 horas).
+- `filters.season_from` / `filters.season_to`: rango de temporada (ej. `"2015-2016"`), o `null`.
+- `output_links`: ruta del archivo de salida con los links.
+
+Cualquier filtro en `null` no restringe nada. Usa los mismos handles de Codeforces que `config.json["users"]` (los gyms viven en Codeforces).
+
+Nota sobre el chequeo de tutorial/editorial: scrapea `codeforces.com/gym/{id}` con `curl` (no con la librería `requests` de Python, que Cloudflare bloquea por su fingerprint TLS) y reutiliza cookies entre pedidos para no disparar el challenge anti-bot. Si algún pedido puntual queda bloqueado igual, se muestra como "couldn't check" en vez de asumir que no tiene tutorial.
+
 ## Configurar Google Sheets
 
 1. Crea un proyecto en Google Cloud.
