@@ -12,6 +12,16 @@ CONTESTS_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
 CONTEST_PROBLEM_URL = "https://kenkoooo.com/atcoder/resources/contest-problem.json"
 SUBMISSIONS_URL = "https://kenkoooo.com/atcoder/atcoder-api/v3/user/submissions"
 
+# Unofficial, undocumented endpoint that powers vjudge.net's own status page
+# (confirmed 2026-09-14 by inspecting the request the page itself makes).
+# probNum for AtCoder problems already matches kenkoooo's problem_id format
+# (e.g. "abc415_b"), so no translation is needed between the two sources.
+VJUDGE_STATUS_URL = "https://vjudge.net/status/data"
+VJUDGE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "X-Requested-With": "XMLHttpRequest",
+}
+
 ABC_RE = re.compile(r"^abc(\d+)$")
 
 
@@ -71,6 +81,57 @@ def fetch_user_ac(user):
     return solved
 
 
+def fetch_user_vjudge_ac(vjudge_user, page_size=100):
+    """Accepted AtCoder problems submitted through vjudge.net's mirror, which
+    doesn't show up in kenkoooo's own submissions API. Recognized by probNum
+    (== kenkoooo's problem_id) with status "Accepted", filtered server-side
+    to OJId=AtCoder. recordsTotal/recordsFiltered in the response are dummy
+    sentinel values, not real counts, so pagination stops on a short page."""
+    print(f"  [{vjudge_user}] (vjudge) fetching submissions...", end="", flush=True)
+    solved = set()
+    start = 0
+    total = 0
+    while True:
+        try:
+            r = requests.get(
+                VJUDGE_STATUS_URL,
+                params={"draw": 1, "start": start, "length": page_size,
+                        "un": vjudge_user, "OJId": "AtCoder"},
+                headers=VJUDGE_HEADERS,
+                timeout=20,
+            )
+            r.raise_for_status()
+            rows = r.json().get("data", [])
+        except Exception as e:
+            print(f" request failed: {e}")
+            break
+        if not rows:
+            break
+        for row in rows:
+            total += 1
+            if row.get("status") == "Accepted":
+                solved.add(row["probNum"])
+        if len(rows) < page_size:
+            break
+        start += page_size
+        time.sleep(0.3)
+    print(f" {len(solved)} accepted ({total} submissions)")
+    return solved
+
+
+def fetch_group_solved(users):
+    """`users` is a list of {"atcoder": handle, "vjudge": handle_or_None}.
+    Unions each member's AtCoder-native submissions with their vjudge mirror
+    submissions (when they have a vjudge handle on file)."""
+    solved = set()
+    for user in users:
+        solved |= fetch_user_ac(user["atcoder"])
+        vjudge_user = user.get("vjudge")
+        if vjudge_user:
+            solved |= fetch_user_vjudge_ac(vjudge_user)
+    return solved
+
+
 def find_recommended_abc(users, count, lookback):
     contests = fetch_contests()
     abc_contests = []
@@ -84,9 +145,7 @@ def find_recommended_abc(users, count, lookback):
     problem_map = fetch_contest_problems()
 
     print("\n=== Fetching user submissions ===")
-    solved = set()
-    for user in users:
-        solved |= fetch_user_ac(user)
+    solved = fetch_group_solved(users)
     print(f"  Total unique accepted problems across all users: {len(solved)}\n")
 
     recommended = []
@@ -118,7 +177,11 @@ def main():
         print("No hay usuarios configurados en config.json['atcoder']['users'].")
         return
 
-    print(f"Users ({len(users)}): {', '.join(users)}")
+    user_labels = [
+        f"{u['atcoder']}+vjudge:{u['vjudge']}" if u.get("vjudge") else u["atcoder"]
+        for u in users
+    ]
+    print(f"Users ({len(users)}): {', '.join(user_labels)}")
     print(f"Looking back {lookback} most recent ABCs, recommending up to {count}.\n")
 
     recommended = find_recommended_abc(users, count, lookback)

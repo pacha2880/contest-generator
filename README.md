@@ -115,21 +115,28 @@ py main.py atcoder
 
 Busca, entre los ABC más recientes (`lookback` en `config.json`), los que ningún usuario configurado haya tocado (ningún problema del contest resuelto), y recomienda hasta `count` de ellos. Imprime los links en terminal y los guarda en `outputs/atcoder_links.txt`.
 
+Cuenta como "resuelto" un problema aceptado tanto en la cuenta de **AtCoder** del usuario como en su cuenta de **vjudge.net** (si tiene una configurada) — vjudge deja enviar soluciones a problemas de AtCoder a través de su propio mirror, y esas submissions no aparecen en la API de AtCoder Problems (`kenkoooo.com`), así que sin este segundo chequeo se podían recomendar contests que alguien ya había resuelto ahí.
+
 Configuración en `config.json`:
 
 ```json
 "atcoder": {
-    "users": ["handle1", "handle2"],
+    "users": [
+        {"atcoder": "handle1", "vjudge": "handle1"},
+        {"atcoder": "handle2", "vjudge": null}
+    ],
     "count": 5,
     "lookback": 50,
     "output_links": "outputs/atcoder_links.txt"
 }
 ```
 
-- `users`: handles de **AtCoder** (no son necesariamente los mismos que los de Codeforces). Actualmente solo tiene un handle de prueba (`pacha2880`) — hay que completar la lista real del grupo.
+- `users`: lista de pares por persona. `atcoder` es obligatorio (handle de AtCoder, no necesariamente igual al de Codeforces). `vjudge` es el handle de esa misma persona en vjudge.net — puede ser `null` si no tiene cuenta ahí o no la configuraste todavía; en ese caso solo se chequea AtCoder para esa persona.
 - `count`: cuántos contests recomendar.
 - `lookback`: cuántos ABC recientes considerar como candidatos.
 - `output_links`: ruta del archivo de salida con los links.
+
+Nota sobre vjudge: usa un endpoint interno no documentado (`vjudge.net/status/data`, el mismo que usa la propia página de status) — no hay garantía de que Vjudge no lo cambie sin aviso.
 
 También podés seguir usando `py main.py codeforces` como alias de `py app.py`.
 

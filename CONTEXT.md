@@ -223,7 +223,7 @@ py -c "import requests; r=requests.get('https://codeforces.com/api/contest.list'
 
 Estado: implementado (2026-09-03). Ver `atcoder.py` y `main.py`.
 
-`config.json["atcoder"]["users"]` tiene 4 handles reales confirmados (2026-09-03): `pacha2880` (256 AC), `DilanJCM8787` (208 AC), `AMAMEMIE` (123 AC), `pypyroxboy` (171 AC). Corresponden a un subconjunto de los 36 usuarios de Codeforces (`pacha2880`, `Dilan8787`→`DilanJCM8787`, `AMAMEMIE`, `PyroxBoy`→`pypyroxboy`), pero el handle de AtCoder no siempre coincide con el de Codeforces. Falta completar el resto del grupo (32 usuarios sin handle de AtCoder todavía).
+`config.json["atcoder"]["users"]` tiene 4 pares reales confirmados: `pacha2880`/`pacha2880` (256 AC en AtCoder), `DilanJCM8787`/`DilanJCM8787` (211 AC), `AMAMEMIE`/`AMAMEMIE_uwu` (127 AC), `pypyroxboy`/`PyroxBoy` (173 AC). Corresponden a un subconjunto de los 36 usuarios de Codeforces (`pacha2880`, `Dilan8787`→`DilanJCM8787`, `AMAMEMIE`, `PyroxBoy`→`pypyroxboy`), pero el handle de AtCoder no siempre coincide con el de Codeforces (y el de vjudge tampoco necesariamente coincide con el de AtCoder — ver más abajo). Falta completar el resto del grupo (32 usuarios sin handle de AtCoder todavía).
 
 Decisiones tomadas al implementar:
 
@@ -231,6 +231,24 @@ Decisiones tomadas al implementar:
 - La API de AtCoder Problems (`kenkoooo.com`) no pagina por índice sino por `from_second`; `atcoder.py` avanza `from_second` al último `epoch_second` + 1 hasta recibir un batch de menos de 500 resultados.
 - Un contest se recomienda solo si **ningún** problema del contest fue resuelto (AC) por **ningún** usuario configurado (contest "intacto"), igual que especifica el algoritmo original.
 - Probado end-to-end contra las APIs reales: con `lookback=50` y `count=5` devolvió abc473–abc469 (los 5 ABC más recientes al no haber overlap con el único usuario de prueba).
+
+### Integración con vjudge.net (2026-09-14)
+
+vjudge.net deja resolver problemas de AtCoder a través de su propio mirror, y esas submissions no aparecen en la API de AtCoder Problems (`kenkoooo.com`) — solo las hechas directo en `atcoder.jp`. Eso significaba que el recomendador podía sugerir un contest que alguien ya había resuelto, solo que vía vjudge.
+
+Investigación: vjudge no tiene API pública, pero la propia página `vjudge.net/status#un=<user>&OJId=<oj>&probNum=<prob>` hace un fetch a un endpoint interno no documentado que sí es directamente usable:
+
+```
+GET https://vjudge.net/status/data?draw=1&start=0&length=100&un=<vjudge_handle>&OJId=AtCoder
+```
+
+Confirmado con requests reales (2026-09-14): funciona sin problema con la librería `requests` de Python (a diferencia de las páginas HTML de gym de Codeforces, acá no hay bloqueo de Cloudflare por fingerprint). Sin `probNum` en los parámetros devuelve **todas** las submissions de ese usuario en ese juez, paginadas por `start`/`length` (no por `draw`). Cada fila trae `probNum` (para AtCoder, ya viene en el mismo formato que `problem_id` de kenkoooo, ej. `"abc415_b"` — no hace falta traducir) y `status` (string literal, ej. `"Accepted"`). `recordsTotal`/`recordsFiltered` son valores sentinel (`9999999`) y no sirven para paginar; hay que cortar cuando una página devuelve menos filas que `length`. Un handle inexistente devuelve `{"data": [], ...}` sin error.
+
+Decisiones:
+
+- `config.json["atcoder"]["users"]` pasó de lista plana de handles a lista de pares `{"atcoder": handle, "vjudge": handle_o_null}` — a pedido del usuario, porque el handle de vjudge de una persona no siempre coincide con el de AtCoder (ver `AMAMEMIE`→`AMAMEMIE_uwu`, `pypyroxboy`→`PyroxBoy`). `vjudge: null` es válido y salta el chequeo de vjudge para esa persona.
+- `fetch_group_solved()` en `atcoder.py` une el set de resueltos en AtCoder nativo (`fetch_user_ac`) con el de vjudge (`fetch_user_vjudge_ac`, solo si `vjudge` no es `null`) para cada usuario.
+- Probado end-to-end: con los 4 pares reales, el total de problemas únicos resueltos por el grupo subió de lo que daba antes (solo AtCoder nativo) a 648 al sumar vjudge (ej. `pacha2880` sumó 144 AC extra vía vjudge que no estaban en su cuenta nativa de AtCoder), confirmando que la integración captura submissions reales que antes se perdían.
 
 Objetivo original: agregar un módulo simple para recomendar AtCoder Beginner Contests recientes en los que ninguno de los usuarios configurados haya resuelto ningún problema.
 
@@ -248,13 +266,18 @@ Configuración propuesta:
 ```json
 {
   "atcoder": {
-    "users": ["handle1", "handle2"],
+    "users": [
+      {"atcoder": "handle1", "vjudge": "handle1"},
+      {"atcoder": "handle2", "vjudge": null}
+    ],
     "count": 5,
     "lookback": 50,
     "output_links": "outputs/atcoder_links.txt"
   }
 }
 ```
+
+(Forma original del plan, era una lista plana de handles; pasó a pares atcoder/vjudge el 2026-09-14, ver sección de integración con vjudge más abajo.)
 
 Fuentes de datos:
 

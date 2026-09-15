@@ -92,7 +92,12 @@
     "sheets_url": "https://docs.google.com/spreadsheets/d/1r3DtJmLLfe71z-kavyngaYmfs63xQq0Vq2aQd6d4Lq8/edit?usp=sharing",
     "credentials_file": "credentials.json",
     "atcoder": {
-        "users": ["pacha2880", "DilanJCM8787", "AMAMEMIE", "pypyroxboy"],
+        "users": [
+            {"atcoder": "pacha2880", "vjudge": "pacha2880"},
+            {"atcoder": "DilanJCM8787", "vjudge": "DilanJCM8787"},
+            {"atcoder": "AMAMEMIE", "vjudge": "AMAMEMIE_uwu"},
+            {"atcoder": "pypyroxboy", "vjudge": "PyroxBoy"}
+        ],
         "count": 50,
         "lookback": 50,
         "output_links": "outputs/atcoder_links.txt"
