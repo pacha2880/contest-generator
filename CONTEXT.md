@@ -223,7 +223,7 @@ py -c "import requests; r=requests.get('https://codeforces.com/api/contest.list'
 
 Estado: implementado (2026-09-03). Ver `atcoder.py` y `main.py`.
 
-`config.json["atcoder"]["users"]` tiene 4 pares reales confirmados: `pacha2880`/`pacha2880` (256 AC en AtCoder), `DilanJCM8787`/`DilanJCM8787` (211 AC), `AMAMEMIE`/`AMAMEMIE_uwu` (127 AC), `pypyroxboy`/`PyroxBoy` (173 AC). Corresponden a un subconjunto de los 36 usuarios de Codeforces (`pacha2880`, `Dilan8787`→`DilanJCM8787`, `AMAMEMIE`, `PyroxBoy`→`pypyroxboy`), pero el handle de AtCoder no siempre coincide con el de Codeforces (y el de vjudge tampoco necesariamente coincide con el de AtCoder — ver más abajo). Falta completar el resto del grupo (32 usuarios sin handle de AtCoder todavía).
+`config.json["atcoder"]["users_atcoder"]`/`["users_vjudge"]` tenían 4 handles reales confirmados cada una (`pacha2880`, `DilanJCM8787`, `AMAMEMIE`/`AMAMEMIE_uwu`, `pypyroxboy`/`PyroxBoy`), pero el usuario los recortó manualmente (2026-10-02) a solo `users_atcoder: ["DilanJCM8787"]` y `users_vjudge: ["DilanJCM8787", "DJCM8787"]` mientras probaba — posiblemente sin querer, no lo revertí porque no está claro si fue deliberado. Si la intención era recomendar para todo el grupo, falta restaurar `pacha2880`, `AMAMEMIE`/`AMAMEMIE_uwu` y `pypyroxboy`/`PyroxBoy` en ambas listas. También falta completar el resto del grupo de Codeforces (32 de 36 sin handle de AtCoder todavía).
 
 Decisiones tomadas al implementar:
 
@@ -246,9 +246,10 @@ Confirmado con requests reales (2026-09-14): funciona sin problema con la librer
 
 Decisiones:
 
-- `config.json["atcoder"]["users"]` pasó de lista plana de handles a lista de pares `{"atcoder": handle, "vjudge": handle_o_null}` — a pedido del usuario, porque el handle de vjudge de una persona no siempre coincide con el de AtCoder (ver `AMAMEMIE`→`AMAMEMIE_uwu`, `pypyroxboy`→`PyroxBoy`). `vjudge: null` es válido y salta el chequeo de vjudge para esa persona.
-- `fetch_group_solved()` en `atcoder.py` une el set de resueltos en AtCoder nativo (`fetch_user_ac`) con el de vjudge (`fetch_user_vjudge_ac`, solo si `vjudge` no es `null`) para cada usuario.
-- Probado end-to-end: con los 4 pares reales, el total de problemas únicos resueltos por el grupo subió de lo que daba antes (solo AtCoder nativo) a 648 al sumar vjudge (ej. `pacha2880` sumó 144 AC extra vía vjudge que no estaban en su cuenta nativa de AtCoder), confirmando que la integración captura submissions reales que antes se perdían.
+- Primer intento (2026-09-14): `config.json["atcoder"]["users"]` pasó de lista plana de handles a lista de pares `{"atcoder": handle, "vjudge": handle_o_null}`. Se abandonó este diseño (2026-10-02) porque el usuario quiso editar la lista a mano y agregó una entrada `{"vjudge": "DJCM8787"}` sin `"atcoder"`, lo cual rompía `main.py` con `KeyError: 'atcoder'` — el acoplamiento forzaba que toda entrada tuviera ambas claves aunque no hiciera falta.
+- Rediseño (2026-10-02): `config.json["atcoder"]["users_atcoder"]` y `["users_vjudge"]`, dos listas planas e independientes, sin requerir mismo tamaño ni correspondencia 1:1 entre ellas. El algoritmo nunca necesitó la asociación persona↔handle de todos modos: solo le interesa la unión de "resueltos en AtCoder nativo" (`users_atcoder`, vía `fetch_user_ac`) con "resueltos en AtCoder vía vjudge" (`users_vjudge`, vía `fetch_user_vjudge_ac`) — separar las listas es tanto más simple como más flexible (alguien puede aparecer en una sola lista, en ambas, o ninguna).
+- `fetch_group_solved(users_atcoder, users_vjudge)` en `atcoder.py` itera cada lista por separado y une los sets resultantes.
+- Probado end-to-end (2026-09-14, con el diseño de pares, 4 personas reales): el total de problemas únicos resueltos por el grupo subió de lo que daba antes (solo AtCoder nativo) a 648 al sumar vjudge (ej. `pacha2880` sumó 144 AC extra vía vjudge que no estaban en su cuenta nativa de AtCoder), confirmando que la integración captura submissions reales que antes se perdían. Vuelto a probar (2026-10-02, con el diseño de dos listas y el recorte manual del usuario a solo `DilanJCM8787`/`DilanJCM8787`+`DJCM8787`): corrió sin el `KeyError`, sumó 322 problemas únicos entre AtCoder nativo (227 AC) y las dos cuentas de vjudge (42 + 91 AC).
 
 Objetivo original: agregar un módulo simple para recomendar AtCoder Beginner Contests recientes en los que ninguno de los usuarios configurados haya resuelto ningún problema.
 
@@ -266,10 +267,8 @@ Configuración propuesta:
 ```json
 {
   "atcoder": {
-    "users": [
-      {"atcoder": "handle1", "vjudge": "handle1"},
-      {"atcoder": "handle2", "vjudge": null}
-    ],
+    "users_atcoder": ["handle1", "handle2"],
+    "users_vjudge": ["handle1_vj", "handle3_vj"],
     "count": 5,
     "lookback": 50,
     "output_links": "outputs/atcoder_links.txt"
@@ -277,7 +276,7 @@ Configuración propuesta:
 }
 ```
 
-(Forma original del plan, era una lista plana de handles; pasó a pares atcoder/vjudge el 2026-09-14, ver sección de integración con vjudge más abajo.)
+(Forma original del plan, era una lista plana de handles. Pasó a pares atcoder/vjudge el 2026-09-14 y de ahí a dos listas independientes el 2026-10-02 — ver sección de integración con vjudge más arriba.)
 
 Fuentes de datos:
 

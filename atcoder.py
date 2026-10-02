@@ -119,20 +119,20 @@ def fetch_user_vjudge_ac(vjudge_user, page_size=100):
     return solved
 
 
-def fetch_group_solved(users):
-    """`users` is a list of {"atcoder": handle, "vjudge": handle_or_None}.
-    Unions each member's AtCoder-native submissions with their vjudge mirror
-    submissions (when they have a vjudge handle on file)."""
+def fetch_group_solved(users_atcoder, users_vjudge):
+    """Two independent handle lists (not required to match in size or to
+    correspond 1:1 — a vjudge handle doesn't need a matching AtCoder one and
+    vice versa). Unions AtCoder-native submissions from users_atcoder with
+    vjudge-mirror submissions from users_vjudge."""
     solved = set()
-    for user in users:
-        solved |= fetch_user_ac(user["atcoder"])
-        vjudge_user = user.get("vjudge")
-        if vjudge_user:
-            solved |= fetch_user_vjudge_ac(vjudge_user)
+    for handle in users_atcoder:
+        solved |= fetch_user_ac(handle)
+    for handle in users_vjudge:
+        solved |= fetch_user_vjudge_ac(handle)
     return solved
 
 
-def find_recommended_abc(users, count, lookback):
+def find_recommended_abc(users_atcoder, users_vjudge, count, lookback):
     contests = fetch_contests()
     abc_contests = []
     for c in contests:
@@ -145,7 +145,7 @@ def find_recommended_abc(users, count, lookback):
     problem_map = fetch_contest_problems()
 
     print("\n=== Fetching user submissions ===")
-    solved = fetch_group_solved(users)
+    solved = fetch_group_solved(users_atcoder, users_vjudge)
     print(f"  Total unique accepted problems across all users: {len(solved)}\n")
 
     recommended = []
@@ -168,23 +168,21 @@ def build_link(contest_id):
 def main():
     cfg = load_config()
     ac_cfg = cfg.get("atcoder", {})
-    users = ac_cfg.get("users", [])
+    users_atcoder = ac_cfg.get("users_atcoder", [])
+    users_vjudge = ac_cfg.get("users_vjudge", [])
     count = ac_cfg.get("count", 5)
     lookback = ac_cfg.get("lookback", 50)
     output_path = ac_cfg.get("output_links", "outputs/atcoder_links.txt")
 
-    if not users:
-        print("No hay usuarios configurados en config.json['atcoder']['users'].")
+    if not users_atcoder and not users_vjudge:
+        print("No hay usuarios configurados en config.json['atcoder']['users_atcoder'/'users_vjudge'].")
         return
 
-    user_labels = [
-        f"{u['atcoder']}+vjudge:{u['vjudge']}" if u.get("vjudge") else u["atcoder"]
-        for u in users
-    ]
-    print(f"Users ({len(users)}): {', '.join(user_labels)}")
+    print(f"AtCoder users ({len(users_atcoder)}): {', '.join(users_atcoder)}")
+    print(f"vjudge users ({len(users_vjudge)}): {', '.join(users_vjudge)}")
     print(f"Looking back {lookback} most recent ABCs, recommending up to {count}.\n")
 
-    recommended = find_recommended_abc(users, count, lookback)
+    recommended = find_recommended_abc(users_atcoder, users_vjudge, count, lookback)
 
     print(f"=== Recommended ABCs ({len(recommended)}/{count}) ===")
     links = []

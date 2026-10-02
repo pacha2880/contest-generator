@@ -121,17 +121,16 @@ Configuración en `config.json`:
 
 ```json
 "atcoder": {
-    "users": [
-        {"atcoder": "handle1", "vjudge": "handle1"},
-        {"atcoder": "handle2", "vjudge": null}
-    ],
+    "users_atcoder": ["handle1", "handle2"],
+    "users_vjudge": ["handle1_vj", "handle3_vj"],
     "count": 5,
     "lookback": 50,
     "output_links": "outputs/atcoder_links.txt"
 }
 ```
 
-- `users`: lista de pares por persona. `atcoder` es obligatorio (handle de AtCoder, no necesariamente igual al de Codeforces). `vjudge` es el handle de esa misma persona en vjudge.net — puede ser `null` si no tiene cuenta ahí o no la configuraste todavía; en ese caso solo se chequea AtCoder para esa persona.
+- `users_atcoder`: handles de **AtCoder** (no necesariamente iguales a los de Codeforces).
+- `users_vjudge`: handles de **vjudge.net**. Es una lista independiente, no tiene que tener el mismo tamaño que `users_atcoder` ni corresponder 1:1 — una persona puede estar en una sola lista, en ambas, o ninguna.
 - `count`: cuántos contests recomendar.
 - `lookback`: cuántos ABC recientes considerar como candidatos.
 - `output_links`: ruta del archivo de salida con los links.

@@ -92,31 +92,30 @@
     "sheets_url": "https://docs.google.com/spreadsheets/d/1r3DtJmLLfe71z-kavyngaYmfs63xQq0Vq2aQd6d4Lq8/edit?usp=sharing",
     "credentials_file": "credentials.json",
     "atcoder": {
-        "users": [
-            {"atcoder": "pacha2880", "vjudge": "pacha2880"},
-            {"atcoder": "DilanJCM8787", "vjudge": "DilanJCM8787"},
-            {"atcoder": "AMAMEMIE", "vjudge": "AMAMEMIE_uwu"},
-            {"atcoder": "pypyroxboy", "vjudge": "PyroxBoy"}
-        ],
-        "count": 50,
-        "lookback": 50,
+        "users_atcoder": ["DilanJCM8787"],
+        "users_vjudge": ["DilanJCM8787", "DJCM8787"],
+        "count": 20,
+        "lookback": 300,
         "output_links": "outputs/atcoder_links.txt"
     },
     "users_gym": [
-        "nicolasalba",
         "__profeta",
         "Simurdiera_MAC",
-        "Alexander1755"
+        "Alexander1755",
+        "Dilan8787",
+        "PyroxBoy",
+        "AMAMEMIE",
+        "BrossoICPC"
     ],
     "gym": {
-        "count": 10,
+        "count": 20,
         "require_editorial": false,
         "filters": {
             "type": "ICPC",
             "kind": ["Official ICPC Contest"],
             "icpc_region": null,
             "difficulty_min": 3,
-            "difficulty_max": 3,
+            "difficulty_max": 4,
             "duration_min_seconds": 18000,
             "duration_max_seconds": 18000,
             "season_from": null,
