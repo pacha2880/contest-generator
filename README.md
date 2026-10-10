@@ -125,6 +125,7 @@ Configuración en `config.json`:
     "users_vjudge": ["handle1_vj", "handle3_vj"],
     "count": 5,
     "lookback": 50,
+    "problems": [],
     "output_links": "outputs/atcoder_links.txt"
 }
 ```
@@ -133,6 +134,7 @@ Configuración en `config.json`:
 - `users_vjudge`: handles de **vjudge.net**. Es una lista independiente, no tiene que tener el mismo tamaño que `users_atcoder` ni corresponder 1:1 — una persona puede estar en una sola lista, en ambas, o ninguna.
 - `count`: cuántos contests recomendar.
 - `lookback`: cuántos ABC recientes considerar como candidatos.
+- `problems`: lista de letras (ej. `["c", "d", "e"]`) para chequear solo esos problemas del contest en vez del contest entero — se recomienda si ninguno de los problemas listados fue resuelto, aunque A/B sí lo estén. Vacía (`[]`, default) revisa el contest completo como antes. Si una letra no existe en algún contest (pasa en ABCs viejos), se reporta en terminal y se la salta para ese contest; si ninguna de las letras pedidas existe ahí, el contest entero se saltea. Cuando esta lista no está vacía, el archivo de salida pasa de `atcoder_links.txt` a `atcoder_links_C-D-E.txt` (sufijo con las letras en mayúscula, antes de la extensión).
 - `output_links`: ruta del archivo de salida con los links.
 
 Nota sobre vjudge: usa un endpoint interno no documentado (`vjudge.net/status/data`, el mismo que usa la propia página de status) — no hay garantía de que Vjudge no lo cambie sin aviso.

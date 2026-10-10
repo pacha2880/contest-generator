@@ -223,7 +223,7 @@ py -c "import requests; r=requests.get('https://codeforces.com/api/contest.list'
 
 Estado: implementado (2026-09-03). Ver `atcoder.py` y `main.py`.
 
-`config.json["atcoder"]["users_atcoder"]`/`["users_vjudge"]` tenían 4 handles reales confirmados cada una (`pacha2880`, `DilanJCM8787`, `AMAMEMIE`/`AMAMEMIE_uwu`, `pypyroxboy`/`PyroxBoy`), pero el usuario los recortó manualmente (2026-10-02) a solo `users_atcoder: ["DilanJCM8787"]` y `users_vjudge: ["DilanJCM8787", "DJCM8787"]` mientras probaba — posiblemente sin querer, no lo revertí porque no está claro si fue deliberado. Si la intención era recomendar para todo el grupo, falta restaurar `pacha2880`, `AMAMEMIE`/`AMAMEMIE_uwu` y `pypyroxboy`/`PyroxBoy` en ambas listas. También falta completar el resto del grupo de Codeforces (32 de 36 sin handle de AtCoder todavía).
+`config.json["atcoder"]["users_atcoder"]`/`["users_vjudge"]` tienen 3-4 handles reales (`AMAMEMIE`/`AMAMEMIE_uwu`, `pypyroxboy`/`PyroxBoy`, `DilanJCM8787`/`DilanJCM8787`+`DJCM8787`; el recorte temporal a solo `DilanJCM8787` del 2026-10-02 ya fue revertido por el usuario). Falta completar el resto del grupo de Codeforces (sin handle de AtCoder todavía).
 
 Decisiones tomadas al implementar:
 
@@ -250,6 +250,17 @@ Decisiones:
 - Rediseño (2026-10-02): `config.json["atcoder"]["users_atcoder"]` y `["users_vjudge"]`, dos listas planas e independientes, sin requerir mismo tamaño ni correspondencia 1:1 entre ellas. El algoritmo nunca necesitó la asociación persona↔handle de todos modos: solo le interesa la unión de "resueltos en AtCoder nativo" (`users_atcoder`, vía `fetch_user_ac`) con "resueltos en AtCoder vía vjudge" (`users_vjudge`, vía `fetch_user_vjudge_ac`) — separar las listas es tanto más simple como más flexible (alguien puede aparecer en una sola lista, en ambas, o ninguna).
 - `fetch_group_solved(users_atcoder, users_vjudge)` en `atcoder.py` itera cada lista por separado y une los sets resultantes.
 - Probado end-to-end (2026-09-14, con el diseño de pares, 4 personas reales): el total de problemas únicos resueltos por el grupo subió de lo que daba antes (solo AtCoder nativo) a 648 al sumar vjudge (ej. `pacha2880` sumó 144 AC extra vía vjudge que no estaban en su cuenta nativa de AtCoder), confirmando que la integración captura submissions reales que antes se perdían. Vuelto a probar (2026-10-02, con el diseño de dos listas y el recorte manual del usuario a solo `DilanJCM8787`/`DilanJCM8787`+`DJCM8787`): corrió sin el `KeyError`, sumó 322 problemas únicos entre AtCoder nativo (227 AC) y las dos cuentas de vjudge (42 + 91 AC).
+
+### Filtro por problema específico (2026-10-10)
+
+`config.json["atcoder"]["problems"]` (lista de letras, ej. `["c", "d", "e"]`, default `[]`) achica el chequeo de "contest intacto" a solo esos problemas en vez del contest completo — pedido explícito del usuario para no descartar un contest por tener A/B resueltos cuando lo que importa es practicar problemas de cierta dificultad (C/D/E).
+
+- `find_recommended_abc()` recibe `problem_letters` opcional. Si está vacío, se comporta exactamente igual que antes (chequea todos los problemas del contest). Si no, por cada contest candidato arma `f"{contest_id}_{letter}"` y verifica que ese id exista en el mapa de problemas de kenkoooo antes de usarlo.
+- Letra que no existe para un contest puntual: se imprime una nota (`Nota: {contest_id} no tiene problema '{LETRA}', se omite para este contest`) y se sigue solo con las letras que sí existen ahí — no es un error, cada contest se evalúa con las letras que tenga disponibles.
+- Si **ninguna** de las letras pedidas existe en un contest, se saltea el contest entero (no tiene sentido recomendarlo para practicar problemas que no tiene).
+- Caso real encontrado al investigar antes de implementar: los ABC viejos (hasta ~abc085) usan sufijos numéricos (`abc001_1`, no `abc001_a`), y algunos de esa época (ej. `abc086`) tienen su C/D con `problem_id` de ARC (`arc089_a`), no de ABC. No hizo falta ningún caso especial para esto — como el chequeo es por membership en el mapa real de problemas (no por construcción ciega del id), esos casos simplemente caen en "letra no existe, se reporta y se saltea" sin romper nada. Verificado con `problem_letters=["z"]` y `lookback=10000`: reportó "no tiene problema Z" en los ~18 ABC más viejos y no recomendó ninguno (lista vacía), en vez de recomendar contests donde la letra ni se chequeó.
+- Cuando `problems` no está vacío, el archivo de salida cambia de `outputs/atcoder_links.txt` a `outputs/atcoder_links_C-D-E.txt` (letras en mayúscula, unidas con `-`, insertadas antes de la extensión) — pedido explícito del usuario para distinguir qué filtro se usó en cada corrida.
+- Probado end-to-end: con `problems: []` el resultado fue idéntico a antes del cambio (20/20, mismos contests). Con `problems: ["c", "d", "e"]` recomendó más contests que antes (lógico: es una condición más débil que "contest completo intacto") y guardó en `outputs/atcoder_links_C-D-E.txt`.
 
 Objetivo original: agregar un módulo simple para recomendar AtCoder Beginner Contests recientes en los que ninguno de los usuarios configurados haya resuelto ningún problema.
 

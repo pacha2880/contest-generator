@@ -132,7 +132,15 @@ def fetch_group_solved(users_atcoder, users_vjudge):
     return solved
 
 
-def find_recommended_abc(users_atcoder, users_vjudge, count, lookback):
+def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, problem_letters=None):
+    """problem_letters: e.g. ["c", "d", "e"] narrows the check from "any
+    problem in the contest" to just those letters — a contest is recommended
+    if none of THOSE specific problems were solved, even if others were.
+    Empty/None means check the whole contest (original behavior). A letter
+    that doesn't exist for a given contest (old ABCs use numeric suffixes,
+    and some borrow problems from ARC) is reported and skipped for that
+    contest; if none of the requested letters exist there, the contest is
+    skipped entirely — there's nothing matching the filter to recommend."""
     contests = fetch_contests()
     abc_contests = []
     for c in contests:
@@ -153,7 +161,21 @@ def find_recommended_abc(users_atcoder, users_vjudge, count, lookback):
         problems = problem_map.get(c["id"], [])
         if not problems:
             continue
-        if any(p in solved for p in problems):
+
+        if problem_letters:
+            target = []
+            for letter in problem_letters:
+                pid = f"{c['id']}_{letter}"
+                if pid in problems:
+                    target.append(pid)
+                else:
+                    print(f"  Nota: {c['id']} no tiene problema '{letter.upper()}', se omite para este contest")
+            if not target:
+                continue
+        else:
+            target = problems
+
+        if any(p in solved for p in target):
             continue
         recommended.append(c)
         if len(recommended) >= count:
@@ -173,6 +195,7 @@ def main():
     count = ac_cfg.get("count", 5)
     lookback = ac_cfg.get("lookback", 50)
     output_path = ac_cfg.get("output_links", "outputs/atcoder_links.txt")
+    problem_letters = [p.lower() for p in ac_cfg.get("problems", [])]
 
     if not users_atcoder and not users_vjudge:
         print("No hay usuarios configurados en config.json['atcoder']['users_atcoder'/'users_vjudge'].")
@@ -180,9 +203,13 @@ def main():
 
     print(f"AtCoder users ({len(users_atcoder)}): {', '.join(users_atcoder)}")
     print(f"vjudge users ({len(users_vjudge)}): {', '.join(users_vjudge)}")
+    if problem_letters:
+        print(f"Filtering to problems: {', '.join(p.upper() for p in problem_letters)}")
+        base, ext = os.path.splitext(output_path)
+        output_path = f"{base}_{'-'.join(p.upper() for p in problem_letters)}{ext}"
     print(f"Looking back {lookback} most recent ABCs, recommending up to {count}.\n")
 
-    recommended = find_recommended_abc(users_atcoder, users_vjudge, count, lookback)
+    recommended = find_recommended_abc(users_atcoder, users_vjudge, count, lookback, problem_letters)
 
     print(f"=== Recommended ABCs ({len(recommended)}/{count}) ===")
     links = []
