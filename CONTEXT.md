@@ -1,17 +1,18 @@
 # Contexto del proyecto para LLM
 
-Última actualización: 2026-09-03.
+Última actualización: 2026-10-10.
 
 Este documento resume el estado real del proyecto, las decisiones tomadas y los detalles técnicos necesarios para continuar sin perder contexto.
 
 ## Qué hace el proyecto
 
-ProblemsHunter es una herramienta de entrenamiento competitivo para un grupo de programadores bolivianos en Codeforces.
+ProblemsHunter es una herramienta de entrenamiento competitivo para un grupo de programadores bolivianos, con tres flujos iguales en espíritu (API pública → filtrar lo no resuelto por el grupo → mostrar/guardar), cada uno seleccionable desde `main.py`:
 
-Tiene dos flujos principales:
+1. `app.py` (`py main.py codeforces`): usa la API pública de Codeforces para encontrar problemas que ningún miembro del grupo haya resuelto, filtrados por dificultad y ordenados del más reciente al más antiguo.
+2. `atcoder.py` (`py main.py atcoder`): recomienda AtCoder Beginner Contests recientes sin resolver por el grupo (AtCoder nativo + vjudge.net). Ver "Plan de implementación: recomendador AtCoder ABC" más abajo.
+3. `gym.py` (`py main.py gym`): recomienda gyms de Codeforces sin resolver por el grupo. Ver "Plan de implementación: recomendador de gyms de Codeforces" más abajo.
 
-1. `app.py`: usa la API pública de Codeforces para encontrar problemas que ningún miembro del grupo haya resuelto, filtrados por dificultad y ordenados del más reciente al más antiguo.
-2. `fill_sheet.py`: sube esos problemas a una Google Sheet estructurada en 5 contests de entrenamiento, conservando problemas preexistentes del sheet y añadiendo tema, observación/pista y nombre oficial del contest.
+Hasta 2026-10-10 `app.py` también subía los problemas a una Google Sheet estructurada en 5 contests (vía `fill_sheet.py`, con `read_sheet.py`/`update_labels.py` como auxiliares). Se eliminó todo eso a pedido del usuario — quería el flujo de Codeforces tan simple como los de AtCoder y gym, sin la complejidad de mantener una Sheet sincronizada. El detalle de cómo funcionaba queda en el historial de git si hace falta reconstruirlo; no se preservó aparte en este documento para no complicarlo de nuevo.
 
 ## Estado actual
 
@@ -31,14 +32,14 @@ La carpeta ya está inicializada como repositorio Git (rama `main`). `.gitignore
 Los scripts principales compilan correctamente con:
 
 ```powershell
-py -m py_compile app.py fill_sheet.py generate_contest.py read_sheet.py update_labels.py
+py -m py_compile app.py atcoder.py gym.py generate_contest.py main.py
 ```
 
 En esta máquina el comando `python` no está disponible; se usa `py`.
 
 ### Usuarios activos
 
-El archivo `config.json["users_codeforces"]` tiene actualmente 36 handles (usados por `app.py`, `generate_contest.py` y `fill_sheet.py`):
+El archivo `config.json["users_codeforces"]` tiene actualmente 36 handles (usados por `app.py` y `generate_contest.py`):
 
 `__profeta`, `Simurdiera_MAC`, `Alexander1755`, `Karenn`, `Andres_Espada`, `Max241`, `HeReWeGoAgAiN123`, `Oliver_Pozo_Flores`, `OPF10`, `pacha2880`, `NeverSayF`, `alexalvarez123`, `The_Lion_King_777`, `candi_ositos`, `zoryn`, `Gabriel___`, `PyroxBoy`, `pharaoh583`, `ErlandMB`, `romerproblem`, `Dilan8787`, `pablo-acha`, `eeliezercm2`, `jim_games`, `alvmaury1`, `MCMT17`, `mortyseb`, `camilo_zuleta`, `Osvaldo34`, `samuellr`, `grxchx`, `alabrito4007`, `srllamadev`, `AMAMEMIE`, `Mr_chuby`, `Zeincho`
 
@@ -57,90 +58,10 @@ La tanda actual genera 50 problemas:
 
 No hay dificultades 1200 ni 1600 por decisión del usuario.
 
-### Google Sheet
-
-URL configurada:
-
-`https://docs.google.com/spreadsheets/d/1r3DtJmLLfe71z-kavyngaYmfs63xQq0Vq2aQd6d4Lq8/edit?usp=sharing`
-
-Cuenta de servicio:
-
-`pacha-labs@iron-rex-241415.iam.gserviceaccount.com`
-
-Credenciales locales:
-
-`credentials.json`
-
-No subir `credentials.json` a GitHub.
-
 ### Cache y última generación
 
-- `results.txt` contiene la última tanda principal de 50 problemas.
-- `solved.txt` contiene 63 claves de problemas ya recomendados/cacheados.
-- Esto significa que hay 13 problemas adicionales en cache además de los 50 del último lote documentado en `results.txt`.
-
-## Estructura del Google Sheet
-
-Cada contest ocupa 5 filas más 1 fila en blanco:
-
-```text
-Fila 1: Contest N   | A                        | B                        | ...
-Fila 2: rating      | 1900                     | 1700                     | ...
-Fila 3: tema        | Constructivo / Greedy    | Búsqueda binaria         | ...
-Fila 4: observación | Pista breve de solución  | Otra pista               | ...
-Fila 5: contest     | Codeforces Round ...     | Educational Round ...    | ...
-Fila 6: vacía
-```
-
-Las letras en la fila 1 son fórmulas `=HYPERLINK("url","A")`, no texto plano. Al leer el sheet con `value_render_option="FORMULA"` se ven las fórmulas; con render por defecto solo se ven las letras.
-
-Cada contest tiene actualmente 14 columnas: 4 problemas existentes más 10 problemas nuevos.
-
-## Problemas existentes en el sheet
-
-Estos 18 problemas ya existían antes del proyecto. Tienen ratings 1700-2900 y vienen de Bubble Cup X y Educational Rounds 1-9. Sus URLs originales se extrajeron con la Sheets API v4 (`includeGridData=true`) porque eran rich-text hyperlinks, no fórmulas.
-
-| Contest | URL CF | Rating | Tema | Contest oficial |
-|---|---|---:|---|---|
-| 1-A | `/contest/852/problem/B` | 2000 | DP / Matrices | Bubble Cup X |
-| 1-B | `/contest/852/problem/F` | 2200 | Combinatoria / Matemáticas | Bubble Cup X |
-| 1-C | `/contest/616/problem/E` | 2200 | Matemáticas / Teoría de números | Educational Round 5 |
-| 1-D | `/contest/622/problem/D` | 1900 | Constructivo | Educational Round 7 |
-| 2-A | `/contest/852/problem/G` | 1700 | Implementación | Bubble Cup X |
-| 2-B | `/contest/852/problem/D` | 2100 | Búsqueda binaria / Flujos | Bubble Cup X |
-| 2-C | `/contest/852/problem/E` | 2100 | Programación dinámica | Bubble Cup X |
-| 2-D | `/contest/612/problem/E` | 2200 | Constructivo / Ciclos | Educational Round 4 |
-| 3-A | `/contest/598/problem/E` | 2000 | DP / Fuerza bruta | Educational Round 1 |
-| 3-B | `/contest/598/problem/F` | 2900 | Geometría | Educational Round 1 |
-| 3-C | `/contest/622/problem/F` | 2600 | Matemáticas / Interpolación | Educational Round 7 |
-| 4-A | `/contest/600/problem/F` | 2800 | Grafos / Coloreo de aristas | Educational Round 2 |
-| 4-B | `/contest/609/problem/D` | 2000 | Búsqueda binaria / Greedy | Educational Round 3 |
-| 4-C | `/contest/622/problem/E` | 2200 | DFS / Greedy / Árboles | Educational Round 7 |
-| 5-A | `/contest/609/problem/F` | 2500 | Estructuras de datos / Greedy | Educational Round 3 |
-| 5-B | `/contest/612/problem/D` | 1800 | Greedy / Ordenamiento | Educational Round 4 |
-| 5-C | `/contest/620/problem/D` | 2200 | Búsqueda binaria / Dos punteros | Educational Round 6 |
-| 5-D | `/contest/632/problem/D` | 2100 | Fuerza bruta / Matemáticas | Educational Round 9 |
-
-## Problemas nuevos de la última tanda
-
-Distribución por cada contest:
-
-- 1900 x2
-- 1800 x1
-- 1700 x2
-- 1300 x2
-- 900 x2
-- 800 x1
-
-Lista definida en `fill_sheet.py`:
-
-| Contest | Problemas |
-|---|---|
-| Contest 1 | 2217D(1900), 2190B2(1900), 2196C1(1800), 2215A(1700), 2135B(1700), 2216B(1300), 2187A(1300), 2216A(900), 1758B(900), 1912L(800) |
-| Contest 2 | 2189D1(1900), 2184G(1900), 2187B(1800), 2132E(1700), 2123F(1700), 2165A(1300), 2150A(1300), 1585B(900), 1582B(900), 1864A(800) |
-| Contest 3 | 2174B(1900), 2138B(1900), 2185G(1800), 2122C(1700), 2090C(1700), 2022B(1300), 1978C(1300), 1501B(900), 1488A(900), 1810B(800) |
-| Contest 4 | 2117G(1900), 2109D(1900), 2153D(1800), 2089A(1700), 2080B(1700), 1769C2(1300), 1693A(1300), 1468N(900), 1445B(900), 1769A(800) |
-| Contest 5 | 2077B(1900), 2068F(1900), 2145D(1800), 2072F(1700), 2065G(1700), 1667A(1300), 1615B(1300), 1267B(900), 1225A(900), 1739A(800) |
+- `results.txt` contiene la última tanda principal de problemas.
+- `solved.txt` contiene las claves de problemas ya recomendados/cacheados.
 
 ## Arquitectura de `app.py`
 
@@ -155,34 +76,6 @@ Lista definida en `fill_sheet.py`:
 - Guarda claves en `solved.txt`, por ejemplo `2217D`.
 - Guarda salida legible en `results.txt`.
 
-Importante: `app.py` todavía tiene una función `upload_to_sheets()` al final. Esa subida produce una lista plana, no la estructura completa del sheet principal. Para el flujo principal usar `fill_sheet.py`.
-
-## Arquitectura de `fill_sheet.py`
-
-- `EXISTING`: diccionario con los 18 problemas preexistentes del sheet, sus URLs, tema, observación y contest oficial.
-- `NEW`: diccionario con los 50 problemas nuevos distribuidos 10 por contest.
-- `build_contest_data()`: combina `EXISTING` y `NEW`.
-- `build_sheet_rows()`: construye la matriz de filas para Google Sheets.
-- `upload()`: limpia y reescribe el sheet usando `value_input_option="USER_ENTERED"` para que Sheets evalúe las fórmulas `HYPERLINK`.
-- Usa `random.seed(42)` para shuffle reproducible.
-
-## Cómo extraer hyperlinks rich-text del sheet existente
-
-Los hyperlinks originales del sheet son rich-text links creados con Insert > Link, no fórmulas. `gspread` con `value_render_option="FORMULA"` no los devuelve.
-
-Para obtenerlos hay que llamar a la Sheets API v4 directamente:
-
-```python
-import google.auth.transport.requests
-
-creds.refresh(google.auth.transport.requests.Request())
-url = f"https://sheets.googleapis.com/v4/spreadsheets/{sid}?includeGridData=true"
-r = requests.get(url, headers={"Authorization": f"Bearer {creds.token}"})
-
-# Luego:
-# data["sheets"][0]["data"][0]["rowData"][row]["values"][col]["hyperlink"]
-```
-
 ## Decisiones de diseño
 
 | Decisión | Razón |
@@ -190,34 +83,21 @@ r = requests.get(url, headers={"Authorization": f"Bearer {creds.token}"})
 | API de Codeforces en vez de Selenium | Es más rápida, estable y no depende de Chrome. |
 | `solved.txt` como cache | Evita repetir sugerencias entre ejecuciones. |
 | Repeticiones en `difficulties` | Cada ocurrencia representa un problema pedido de esa dificultad. |
-| `random.seed(42)` | Permite reproducir el mismo orden de contests. |
-| `fill_sheet.py` separado de `app.py` | Permite generar problemas sin tocar Google Sheets y subir solo cuando el lote esté listo. |
 | Sin 1200 ni 1600 | Se eliminaron por decisión del usuario. |
+| Sin Google Sheets (2026-10-10) | `fill_sheet.py`, `read_sheet.py`, `update_labels.py` y la función `upload_to_sheets()` de `app.py` se eliminaron a pedido del usuario — quería el flujo de Codeforces tan simple como `atcoder.py`/`gym.py` (fetch → filtrar → mostrar/guardar en archivo), sin la complejidad de mantener credenciales de Google Cloud y una Sheet sincronizada. `config.json` perdió `sheets_url` y `credentials_file`; `requirements.txt` perdió `gspread`/`google-auth`. |
 
 ## Flujo para actualizar usuarios o dificultades
 
 1. Editar `config.json`.
 2. Borrar `solved.txt` y `results.txt` si se quiere regenerar desde cero.
-3. Ejecutar `py app.py`.
+3. Ejecutar `py main.py codeforces`.
 4. Revisar `results.txt`.
-5. Actualizar `NEW` en `fill_sheet.py` con problemas, temas, observaciones y contests oficiales.
-6. Restaurar manualmente el sheet a su estado base si hace falta.
-7. Ejecutar `py fill_sheet.py`.
-
-Para obtener nombres oficiales de contests:
-
-```powershell
-py -c "import requests; r=requests.get('https://codeforces.com/api/contest.list',params={'gym':False}); [print(c['id'],'|',c['name']) for c in r.json()['result'] if c['id'] in {2217,2190}]"
-```
 
 ## Gotchas importantes
 
 - Codeforces puede rate-limitear `user.status`; si falla, esperar y reintentar.
 - `user.status` usa `count=10000`; si un handle tiene más envíos, puede hacer falta aumentar ese valor.
-- El usuario suele restaurar manualmente el sheet antes de correr `fill_sheet.py`.
-- `fill_sheet.py` limpia y reescribe el sheet.
 - En Windows puede haber problemas de encoding en consola; los scripts ya usan configuración UTF-8 para stdout donde aplica.
-- Las credenciales pertenecen al proyecto Google Cloud `iron-rex-241415` y la cuenta de servicio `pacha-labs`.
 
 ## Plan de implementación: recomendador AtCoder ABC
 
@@ -227,7 +107,7 @@ Estado: implementado (2026-09-03). Ver `atcoder.py` y `main.py`.
 
 Decisiones tomadas al implementar:
 
-- `main.py` es un selector mínimo que no refactoriza `app.py`: `py main.py codeforces` simplemente importa y llama a `app.main()`; `py main.py atcoder` llama a `atcoder.main()`. `app.py` y `fill_sheet.py` siguen funcionando igual que antes, sin cambios.
+- `main.py` es un selector mínimo que no refactoriza `app.py`: `py main.py codeforces` simplemente importa y llama a `app.main()`; `py main.py atcoder` llama a `atcoder.main()`.
 - La API de AtCoder Problems (`kenkoooo.com`) no pagina por índice sino por `from_second`; `atcoder.py` avanza `from_second` al último `epoch_second` + 1 hasta recibir un batch de menos de 500 resultados.
 - Un contest se recomienda solo si **ningún** problema del contest fue resuelto (AC) por **ningún** usuario configurado (contest "intacto"), igual que especifica el algoritmo original.
 - Probado end-to-end contra las APIs reales: con `lookback=50` y `count=5` devolvió abc473–abc469 (los 5 ABC más recientes al no haber overlap con el único usuario de prueba).
@@ -354,8 +234,8 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 
 ### Decisiones de diseño
 
-- `main.py` gana un tercer modo: `py main.py gym`, mismo patrón que `atcoder.py` — no toca `app.py`/`fill_sheet.py`.
-- Usa `config.json["users_gym"]`, una lista separada de `users_codeforces` (2026-09-14, a pedido del usuario) — por defecto tiene solo 4 handles de prueba (`nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755`), no los 36 del grupo completo. Permite probar el módulo sin las ~36 llamadas a `user.status` que tardan minutos, y sin acoplar el flujo de gyms al de Codeforces/Sheets.
+- `main.py` gana un tercer modo: `py main.py gym`, mismo patrón que `atcoder.py` — no toca `app.py`.
+- Usa `config.json["users_gym"]`, una lista separada de `users_codeforces` (2026-09-14, a pedido del usuario) — por defecto tiene solo 4 handles de prueba (`nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755`), no los 36 del grupo completo. Permite probar el módulo sin las ~36 llamadas a `user.status` que tardan minutos, y sin acoplar el flujo de gyms al de Codeforces.
 - "Hide, if participated" de la UI de CF **no se replica aparte**: nuestro paso de exclusión (gym tocado por cualquier usuario del grupo, no solo la cuenta logueada) ya es una versión más fuerte de ese filtro.
 - "Hide excluded gyms" (lista de exclusión manual guardada en la cuenta de CF) se descarta — no es información pública vía API y el usuario confirmó que no importa para este caso de uso.
 - Chequeo de tutorial/editorial va **al final** por defecto, no como filtro de selección: primero se arma la lista final de recomendados (post-filtro de metadata, post-exclusión por grupo, ordenados por más recientes, top `count`), y recién sobre esa lista corta se scrapea cada página. Solo informa, no descarta gyms.

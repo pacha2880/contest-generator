@@ -1,32 +1,28 @@
 # ProblemsHunter
 
-ProblemsHunter genera contests de entrenamiento con problemas de Codeforces que ninguno de los usuarios configurados haya resuelto todavía, y puede subirlos a una Google Sheet organizada por contests.
+ProblemsHunter genera recomendaciones de entrenamiento competitivo (problemas de Codeforces, contests de AtCoder y gyms de Codeforces) que ningún usuario configurado haya resuelto todavía.
 
 ## Qué hace
 
-- Consulta la API pública de Codeforces.
+- Consulta las APIs públicas de Codeforces y AtCoder (más el endpoint interno de vjudge.net para submissions de AtCoder vía su mirror).
 - Revisa los envíos aceptados de todos los handles del grupo.
-- Filtra problemas no resueltos por nadie según las dificultades configuradas.
+- Filtra problemas/contests no resueltos por nadie según la configuración de cada flujo.
 - Evita repetir problemas usando una cache local en `solved.txt`.
-- Genera una salida legible en `results.txt`.
-- Sube contests estructurados a Google Sheets con rating, tema, pista y nombre oficial del contest.
+- Genera una salida legible en terminal y en archivo (`results.txt` o `outputs/`, según el flujo).
 
 ## Archivos principales
 
 | Archivo | Descripción |
 |---|---|
-| `app.py` | Genera problemas nuevos consultando la API de Codeforces. |
-| `fill_sheet.py` | Sube los contests estructurados a Google Sheets. |
-| `generate_contest.py` | Script auxiliar para generar contests. |
-| `read_sheet.py` | Script auxiliar para leer datos del sheet. |
-| `update_labels.py` | Script auxiliar para actualizar etiquetas/metadatos. |
-| `main.py` | Punto de entrada para elegir flujo: `py main.py codeforces` o `py main.py atcoder`. |
+| `main.py` | Punto de entrada: `py main.py codeforces`, `py main.py atcoder` o `py main.py gym`. |
+| `app.py` | Genera problemas nuevos de Codeforces consultando su API. |
 | `atcoder.py` | Recomienda AtCoder Beginner Contests recientes sin resolver por el grupo. |
-| `config.json` | Configuración local: usuarios, dificultades, URL del sheet, credenciales y config de AtCoder. |
-| `credentials.json` | Credenciales de Google Cloud. No subir a GitHub. |
+| `gym.py` | Recomienda gyms de Codeforces sin resolver por el grupo. |
+| `generate_contest.py` | Script auxiliar para generar un contest con un problema por dificultad. |
+| `config.json` | Configuración local: usuarios y parámetros de cada flujo. |
 | `solved.txt` | Cache de problemas ya recomendados (Codeforces). |
 | `results.txt` | Resultado de la última generación (Codeforces). |
-| `outputs/atcoder_links.txt` | Links de la última recomendación de AtCoder. |
+| `outputs/` | Salidas de los flujos de AtCoder y gym. |
 | `CONTEXT.md` | Contexto técnico para continuar el proyecto con un LLM. |
 
 ## Instalación
@@ -38,7 +34,7 @@ py -m pip install -r requirements.txt
 O manualmente:
 
 ```powershell
-py -m pip install requests gspread google-auth
+py -m pip install requests
 ```
 
 ## Configuración
@@ -48,16 +44,12 @@ El archivo `config.json` tiene esta forma:
 ```json
 {
     "users_codeforces": ["handle1", "handle2"],
-    "difficulties": ["1900", "1900", "1800", "1700", "1700", "1300", "1300", "900", "900", "800"],
-    "sheets_url": "https://docs.google.com/spreadsheets/d/ID/edit",
-    "credentials_file": "credentials.json"
+    "difficulties": ["1900", "1900", "1800", "1700", "1700", "1300", "1300", "900", "900", "800"]
 }
 ```
 
-- `users_codeforces`: handles de Codeforces del grupo. Los usa `app.py`, `generate_contest.py` y `fill_sheet.py`.
+- `users_codeforces`: handles de Codeforces del grupo. Los usa `app.py` y `generate_contest.py`.
 - `difficulties`: lista con repeticiones. Cada ocurrencia pide un problema de esa dificultad.
-- `sheets_url`: URL completa de la Google Sheet.
-- `credentials_file`: ruta al JSON de la cuenta de servicio de Google Cloud.
 
 La configuración actual usa 36 handles y genera 50 problemas por tanda:
 
@@ -91,23 +83,7 @@ py app.py
 - `results.txt`: lista legible de los problemas generados.
 - `solved.txt`: problemas marcados como ya recomendados para no repetirlos.
 
-### 2. Subir contests a Google Sheets
-
-```powershell
-py fill_sheet.py
-```
-
-`fill_sheet.py` combina los problemas existentes del sheet con los 50 problemas nuevos definidos en el script, los mezcla de forma reproducible y sube la estructura final con:
-
-- Letra del problema como hipervínculo a Codeforces.
-- Fila `rating`.
-- Fila `tema`.
-- Fila `observación`.
-- Fila `contest`.
-
-Nota: para el sheet principal se recomienda usar `fill_sheet.py`. `app.py` conserva una función de subida simple, pero esa salida no tiene la estructura completa por contests.
-
-### 3. Recomendar AtCoder Beginner Contests
+### 2. Recomendar AtCoder Beginner Contests
 
 ```powershell
 py main.py atcoder
@@ -141,7 +117,7 @@ Nota sobre vjudge: usa un endpoint interno no documentado (`vjudge.net/status/da
 
 También podés seguir usando `py main.py codeforces` como alias de `py app.py`.
 
-### 4. Recomendar gyms de Codeforces
+### 3. Recomendar gyms de Codeforces
 
 ```powershell
 py main.py gym
@@ -180,32 +156,17 @@ Configuración en `config.json`:
 - `filters.season_from` / `filters.season_to`: rango de temporada (ej. `"2015-2016"`), o `null`.
 - `output_csv`: ruta del CSV de salida, con columnas `id,name,difficulty,editorial,link` (`editorial` es `yes`/`no`/`unknown (page fetch blocked)`).
 
-Cualquier filtro en `null` no restringe nada. `users_gym` es una lista de handles de Codeforces separada de `users_codeforces` (los gyms viven en Codeforces, pero puede interesar probarlo con un subconjunto del grupo, o con handles distintos, sin afectar `app.py`/`fill_sheet.py`).
+Cualquier filtro en `null` no restringe nada. `users_gym` es una lista de handles de Codeforces separada de `users_codeforces` (los gyms viven en Codeforces, pero puede interesar probarlo con un subconjunto del grupo, o con handles distintos, sin afectar `app.py`).
 
 Nota sobre el chequeo de tutorial/editorial: scrapea `codeforces.com/gym/{id}` con `curl` (no con la librería `requests` de Python, que Cloudflare bloquea por su fingerprint TLS) y reutiliza cookies entre pedidos para no disparar el challenge anti-bot. Si algún pedido puntual queda bloqueado igual, se muestra como "couldn't check" en vez de asumir que no tiene tutorial.
-
-## Configurar Google Sheets
-
-1. Crea un proyecto en Google Cloud.
-2. Activa Google Sheets API y Google Drive API.
-3. Crea una cuenta de servicio.
-4. Descarga el JSON de credenciales como `credentials.json`.
-5. Comparte la Google Sheet con el email de la cuenta de servicio y dale permiso de editor.
-6. Pega la URL del sheet en `config.json`.
 
 ## Flujo recomendado al cambiar usuarios o dificultades
 
 1. Editar `config.json`.
-2. Borrar `solved.txt` y `results.txt`.
-3. Ejecutar `py app.py`.
-4. Actualizar `NEW` en `fill_sheet.py` con los problemas nuevos y sus metadatos.
-5. Restaurar manualmente el sheet a su estado base si hace falta.
-6. Ejecutar `py fill_sheet.py`.
+2. Borrar `solved.txt` y `results.txt` si querés empezar de cero.
+3. Ejecutar `py main.py codeforces` (o `atcoder`/`gym`).
 
 ## Notas importantes
 
-- `solved.txt` acumula problemas entre ejecuciones. En el estado actual contiene 63 entradas.
-- `fill_sheet.py` usa `random.seed(42)` para que el orden sea reproducible.
-- Los problemas preexistentes del sheet se preservan y se completan con tema, observación y contest oficial.
-- No subas `credentials.json` a GitHub.
-- Si inicializas Git, agrega al menos `credentials.json`, `__pycache__/`, `.env`, `solved.txt` y `results.txt` al `.gitignore`.
+- `solved.txt` acumula problemas entre ejecuciones de `app.py`.
+- `outputs/` acumula las salidas de `atcoder.py` y `gym.py`; está en `.gitignore`.

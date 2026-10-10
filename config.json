@@ -89,14 +89,12 @@
         "800",
         "800"
     ],
-    "sheets_url": "https://docs.google.com/spreadsheets/d/1r3DtJmLLfe71z-kavyngaYmfs63xQq0Vq2aQd6d4Lq8/edit?usp=sharing",
-    "credentials_file": "credentials.json",
     "atcoder": {
-        "users_atcoder": ["AMAMEMIE", "pypyroxboy", "DilanJCM8787"],
-        "users_vjudge": ["AMAMEMIE_uwu", "PyroxBoy", "DilanJCM8787", "DJCM8787"],
-        "count": 20,
-        "lookback": 300,
-        "problems": [],
+        "users_atcoder": ["profetaR", "Simurdiera", "dylan_becerra"],
+        "users_vjudge": ["est_chavarria", "Simurdiera_MAC", "dylan_becerra"],
+        "count": 9,
+        "lookback": 100,
+        "problems": ["f"],
         "output_links": "outputs/atcoder_links.txt"
     },
     "users_gym": [
