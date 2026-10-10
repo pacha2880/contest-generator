@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import time
 import requests
@@ -99,8 +100,10 @@ def find_unsolved(problems, stats, rating, user_solved, past, count):
 
 def main():
     cfg = load_config()
-    users = cfg.get("users_codeforces", [])
-    diff_list = cfg.get("difficulties", [])
+    cf_cfg = cfg.get("codeforces", {})
+    users = cf_cfg.get("users", [])
+    diff_list = cf_cfg.get("difficulties", [])
+    output_path = cf_cfg.get("output_links", "results.txt")
 
     if not users:
         raw = input("Enter usernames (space-separated): ")
@@ -152,12 +155,15 @@ def main():
         print()
         result_lines.append("")
 
-    with open("results.txt", "w", encoding="utf-8") as f:
+    out_dir = os.path.dirname(output_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(result_lines))
 
     save_past(newly_recommended)
     print(f"Saved {len(newly_recommended)} problems to {PAST_FILE}.")
-    print("Full results saved to results.txt")
+    print(f"Full results saved to {output_path}")
 
 
 if __name__ == "__main__":

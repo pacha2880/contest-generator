@@ -39,13 +39,11 @@ En esta máquina el comando `python` no está disponible; se usa `py`.
 
 ### Usuarios activos
 
-El archivo `config.json["users_codeforces"]` tiene actualmente 36 handles (usados por `app.py` y `generate_contest.py`):
-
-`__profeta`, `Simurdiera_MAC`, `Alexander1755`, `Karenn`, `Andres_Espada`, `Max241`, `HeReWeGoAgAiN123`, `Oliver_Pozo_Flores`, `OPF10`, `pacha2880`, `NeverSayF`, `alexalvarez123`, `The_Lion_King_777`, `candi_ositos`, `zoryn`, `Gabriel___`, `PyroxBoy`, `pharaoh583`, `ErlandMB`, `romerproblem`, `Dilan8787`, `pablo-acha`, `eeliezercm2`, `jim_games`, `alvmaury1`, `MCMT17`, `mortyseb`, `camilo_zuleta`, `Osvaldo34`, `samuellr`, `grxchx`, `alabrito4007`, `srllamadev`, `AMAMEMIE`, `Mr_chuby`, `Zeincho`
+`config.json["codeforces"]["users"]` tiene actualmente solo 5 handles de prueba (2026-10-10, a pedido del usuario, mismo motivo que `atcoder`/`gym`: corridas rápidas en vez de esperar las ~36 llamadas a `user.status`): `pacha2880`, `PyroxBoy`, `AMAMEMIE`, `Dilan8787`, `__profeta` — los 5 son un subconjunto de la lista completa del grupo que se usó originalmente (36 handles, ver git log si hace falta recuperarla entera).
 
 ### Dificultades activas
 
-La tanda actual genera 50 problemas:
+`config.json["codeforces"]["difficulties"]` tiene actualmente 5 dificultades distintas, una ocurrencia cada una (`1900`, `1700`, `1300`, `900`, `800`), para una tanda de prueba de 5 problemas en vez de 50. La tanda "real" original pedía:
 
 | Dificultad | Cantidad total |
 |---|---:|
@@ -85,6 +83,7 @@ No hay dificultades 1200 ni 1600 por decisión del usuario.
 | Repeticiones en `difficulties` | Cada ocurrencia representa un problema pedido de esa dificultad. |
 | Sin 1200 ni 1600 | Se eliminaron por decisión del usuario. |
 | Sin Google Sheets (2026-10-10) | `fill_sheet.py`, `read_sheet.py`, `update_labels.py` y la función `upload_to_sheets()` de `app.py` se eliminaron a pedido del usuario — quería el flujo de Codeforces tan simple como `atcoder.py`/`gym.py` (fetch → filtrar → mostrar/guardar en archivo), sin la complejidad de mantener credenciales de Google Cloud y una Sheet sincronizada. `config.json` perdió `sheets_url` y `credentials_file`; `requirements.txt` perdió `gspread`/`google-auth`. |
+| Config anidada por flujo, `{flujo}.users` (2026-10-10) | `users_codeforces`/`difficulties` (raíz) y `users_gym` (raíz) pasaron a vivir dentro de `config["codeforces"]`/`config["gym"]`, igual que `atcoder` ya hacía con `users_atcoder`/`users_vjudge`. Pedido explícito del usuario: quería que el bloque de Codeforces "se pareciera a los otros". Se agregó además `codeforces.output_links` (default `results.txt`) para que los 3 flujos tengan una ruta de salida configurable, igual que `atcoder.output_links`/`gym.output_csv`. No se agregó un `count` separado para Codeforces porque ya está codificado en las repeticiones de `difficulties` — agregar un campo redundante hubiera sido complicar, no simplificar. |
 
 ## Flujo para actualizar usuarios o dificultades
 
@@ -235,7 +234,7 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 ### Decisiones de diseño
 
 - `main.py` gana un tercer modo: `py main.py gym`, mismo patrón que `atcoder.py` — no toca `app.py`.
-- Usa `config.json["users_gym"]`, una lista separada de `users_codeforces` (2026-09-14, a pedido del usuario) — por defecto tiene solo 4 handles de prueba (`nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755`), no los 36 del grupo completo. Permite probar el módulo sin las ~36 llamadas a `user.status` que tardan minutos, y sin acoplar el flujo de gyms al de Codeforces.
+- Usa `config.json["gym"]["users"]`, una lista separada de `codeforces.users` (2026-09-14, a pedido del usuario; anidada dentro de `gym` recién el 2026-10-10 — antes vivía como `users_gym` al nivel raíz, movida para que todos los flujos sigan el mismo patrón de `{flujo}.users`) — por defecto tiene unos pocos handles de prueba, no los 36 del grupo completo. Permite probar el módulo sin las ~36 llamadas a `user.status` que tardan minutos, y sin acoplar el flujo de gyms al de Codeforces.
 - "Hide, if participated" de la UI de CF **no se replica aparte**: nuestro paso de exclusión (gym tocado por cualquier usuario del grupo, no solo la cuenta logueada) ya es una versión más fuerte de ese filtro.
 - "Hide excluded gyms" (lista de exclusión manual guardada en la cuenta de CF) se descarta — no es información pública vía API y el usuario confirmó que no importa para este caso de uso.
 - Chequeo de tutorial/editorial va **al final** por defecto, no como filtro de selección: primero se arma la lista final de recomendados (post-filtro de metadata, post-exclusión por grupo, ordenados por más recientes, top `count`), y recién sobre esa lista corta se scrapea cada página. Solo informa, no descarta gyms.
@@ -269,7 +268,7 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 
 ### Algoritmo
 
-1. Leer `config.json`: usuarios (`config["users_gym"]`), filtros de `config["gym"]["filters"]`, `count`, `output_csv`.
+1. Leer `config.json`: usuarios (`config["gym"]["users"]`), filtros de `config["gym"]["filters"]`, `count`, `output_csv`.
 2. Descargar `contest.list?gym=true` (una sola vez, 2630 gyms).
 3. Filtrar candidatos por metadata: `type`, `kind`, `icpc_region`, `difficulty_min/max`, `duration_min/max`, `season_from/to`.
 4. Para cada usuario del grupo, `user.status(handle, count=10000)` y quedarse con el set de `contestId` dentro del rango de IDs de gym (cualquier verdict). Unir en un set global `touched_gyms`.
@@ -288,7 +287,7 @@ Dos bugs encontrados y corregidos durante la implementación (2026-09-14), docum
 - ✅ `README.md`: uso documentado (sección "4. Recomendar gyms de Codeforces").
 - ✅ `CONTEXT.md`: este archivo, actualizado.
 
-Probado end-to-end (2026-09-14) con los handles `nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755`: 447/2630 gyms cumplían los filtros por defecto, ese grupo había tocado 222, y la recomendación final de 10 gyms incluyó una mezcla real de con/sin tutorial (confirmado manualmente contra el HTML, no todo "encontrado" como en el primer intento con los bugs sin corregir). Primero se probó pasando esos handles directo a `find_recommended_gyms()` sin tocar el config; luego, al separar `users_codeforces`/`users_gym`, se corrió `py main.py gym` real con esos mismos 4 handles ya en `config.json["users_gym"]` y dio el mismo resultado.
+Probado end-to-end (2026-09-14) con los handles `nicolasalba`, `__profeta`, `Simurdiera_MAC`, `Alexander1755`: 447/2630 gyms cumplían los filtros por defecto, ese grupo había tocado 222, y la recomendación final de 10 gyms incluyó una mezcla real de con/sin tutorial (confirmado manualmente contra el HTML, no todo "encontrado" como en el primer intento con los bugs sin corregir). Primero se probó pasando esos handles directo a `find_recommended_gyms()` sin tocar el config; luego, al separar `users_codeforces`/`users_gym` (ambas al nivel raíz en ese momento), se corrió `py main.py gym` real y dio el mismo resultado. Vuelto a probar (2026-10-10) tras mover `users_gym` adentro de `gym.users`: 7 usuarios reales, 453/2654 gyms cumplían filtros, 187 tocados, 20/20 recomendados — sin errores.
 
 Comando esperado:
 

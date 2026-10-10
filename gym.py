@@ -195,14 +195,14 @@ def select_recommendations(untouched, count, require_editorial):
 def main():
     cfg = load_config()
     gym_cfg = cfg.get("gym", {})
-    users = cfg.get("users_gym", [])
+    users = gym_cfg.get("users", [])
     filters = gym_cfg.get("filters", {})
     count = gym_cfg.get("count", 10)
     require_editorial = gym_cfg.get("require_editorial", False)
     output_path = gym_cfg.get("output_csv", "outputs/gym_recommendations.csv")
 
     if not users:
-        print("No hay usuarios configurados en config.json['users_gym'].")
+        print("No hay usuarios configurados en config.json['gym']['users'].")
         return
 
     print(f"Users ({len(users)}): {', '.join(users)}")

@@ -43,15 +43,19 @@ El archivo `config.json` tiene esta forma:
 
 ```json
 {
-    "users_codeforces": ["handle1", "handle2"],
-    "difficulties": ["1900", "1900", "1800", "1700", "1700", "1300", "1300", "900", "900", "800"]
+    "codeforces": {
+        "users": ["handle1", "handle2"],
+        "difficulties": ["1900", "1900", "1800", "1700", "1700", "1300", "1300", "900", "900", "800"],
+        "output_links": "outputs/codeforces_results.txt"
+    }
 }
 ```
 
-- `users_codeforces`: handles de Codeforces del grupo. Los usa `app.py` y `generate_contest.py`.
-- `difficulties`: lista con repeticiones. Cada ocurrencia pide un problema de esa dificultad.
+- `codeforces.users`: handles de Codeforces del grupo. Los usa `app.py` y `generate_contest.py`.
+- `codeforces.difficulties`: lista con repeticiones. Cada ocurrencia pide un problema de esa dificultad — no hay un `count` separado porque la cantidad por rating ya está codificada en las repeticiones.
+- `codeforces.output_links`: ruta del archivo de resultados (default `results.txt` en la raíz si no se especifica).
 
-La configuración actual usa 36 handles y genera 50 problemas por tanda:
+Con la configuración de ejemplo del repo (5 handles, 5 dificultades distintas) genera 5 problemas por tanda. La configuración original usaba 36 handles y 50 problemas:
 
 | Dificultad | Por contest | Total |
 |---|---:|---:|
@@ -68,20 +72,20 @@ La configuración actual usa 36 handles y genera 50 problemas por tanda:
 ### 1. Generar problemas nuevos
 
 ```powershell
-py app.py
+py main.py codeforces
 ```
 
 Si cambiaste usuarios o quieres empezar de cero, borra la cache antes:
 
 ```powershell
 Remove-Item solved.txt, results.txt -ErrorAction SilentlyContinue
-py app.py
+py main.py codeforces
 ```
 
 `app.py` guarda:
 
-- `results.txt`: lista legible de los problemas generados.
-- `solved.txt`: problemas marcados como ya recomendados para no repetirlos.
+- `codeforces.output_links` (default `results.txt`): lista legible de los problemas generados.
+- `solved.txt`: problemas marcados como ya recomendados para no repetirlos (cache aparte, no configurable — es lo que evita repetir sugerencias entre corridas).
 
 ### 2. Recomendar AtCoder Beginner Contests
 
@@ -123,12 +127,13 @@ También podés seguir usando `py main.py codeforces` como alias de `py app.py`.
 py main.py gym
 ```
 
-Busca, entre los gyms de Codeforces que cumplen los filtros configurados, los que ningún usuario de `config.json["users_gym"]` haya tocado (ni resuelto ni intentado ningún problema), ordenados de más reciente a más antiguo. Sobre la lista final recomendada revisa además si cada gym tiene tutorial/editorial en "Contest materials". Imprime en terminal id, estrellas de dificultad, si tiene tutorial y el link; guarda una fila por gym (id, nombre, dificultad, editorial, link) en `outputs/gym_recommendations.csv`.
+Busca, entre los gyms de Codeforces que cumplen los filtros configurados, los que ningún usuario de `config.json["gym"]["users"]` haya tocado (ni resuelto ni intentado ningún problema), ordenados de más reciente a más antiguo. Sobre la lista final recomendada revisa además si cada gym tiene tutorial/editorial en "Contest materials". Imprime en terminal id, estrellas de dificultad, si tiene tutorial y el link; guarda una fila por gym (id, nombre, dificultad, editorial, link) en `outputs/gym_recommendations.csv`.
 
 Configuración en `config.json`:
 
 ```json
 "gym": {
+    "users": ["handle1", "handle2"],
     "count": 10,
     "require_editorial": false,
     "filters": {
@@ -146,6 +151,7 @@ Configuración en `config.json`:
 }
 ```
 
+- `users`: handles de Codeforces para este flujo — lista separada de `codeforces.users` (los gyms viven en Codeforces, pero puede interesar probarlo con un subconjunto del grupo, o con handles distintos, sin afectar `app.py`).
 - `count`: cuántos gyms recomendar (por defecto 10).
 - `require_editorial`: si es `true`, solo recomienda gyms que efectivamente tengan tutorial/editorial en "Contest materials" — sigue buscando más abajo en la lista (más antiguos) hasta juntar `count` o agotar los candidatos. Si es `false` (default), recomienda los `count` más recientes sin filtrar por esto, y el chequeo de editorial queda solo informativo en el output.
 - `filters.type`: formato del contest, `"ICPC"` o `"IOI"` (o `null` para no filtrar).
@@ -156,7 +162,7 @@ Configuración en `config.json`:
 - `filters.season_from` / `filters.season_to`: rango de temporada (ej. `"2015-2016"`), o `null`.
 - `output_csv`: ruta del CSV de salida, con columnas `id,name,difficulty,editorial,link` (`editorial` es `yes`/`no`/`unknown (page fetch blocked)`).
 
-Cualquier filtro en `null` no restringe nada. `users_gym` es una lista de handles de Codeforces separada de `users_codeforces` (los gyms viven en Codeforces, pero puede interesar probarlo con un subconjunto del grupo, o con handles distintos, sin afectar `app.py`).
+Cualquier filtro en `null` no restringe nada.
 
 Nota sobre el chequeo de tutorial/editorial: scrapea `codeforces.com/gym/{id}` con `curl` (no con la librería `requests` de Python, que Cloudflare bloquea por su fingerprint TLS) y reutiliza cookies entre pedidos para no disparar el challenge anti-bot. Si algún pedido puntual queda bloqueado igual, se muestra como "couldn't check" en vez de asumir que no tiene tutorial.
 
