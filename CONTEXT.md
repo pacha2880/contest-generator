@@ -294,3 +294,46 @@ Comando esperado:
 ```powershell
 py main.py gym
 ```
+
+## Plan de implementación: GUI de escritorio (en construcción)
+
+Estado: decidido el approach, esqueleto creado (2026-10-10), wiring real pendiente.
+
+### Contexto de la decisión
+
+El usuario quiere eventualmente 3 interfaces para el mismo backend: consola (ya existe), GUI de escritorio (primera prioridad), y web de acceso libre (después, sin apuro). Se discutió a fondo antes de tocar código:
+
+- **Streamlit** quedó descartado para la GUI de escritorio porque siempre levanta un servidor local (Tornado) aunque sea en `localhost` — y el usuario preguntó específicamente por empaquetar a `.exe` más adelante, donde Streamlit+PyInstaller tiene fricción documentada (assets estáticos del paquete no siempre se detectan). Tkinter/FreeSimpleGUI empaquetan mucho más confiable con PyInstaller al ser stdlib o liviano.
+- **FreeSimpleGUI** (fork libre de PySimpleGUI, que pasó a ser de pago) elegido sobre Tkinter puro por menos código de layout, y sobre PyQt/PySide por ser más liviano.
+- **Streamlit sigue siendo la recomendación para la versión web** cuando llegue ese momento — ahí sí tiene sentido un servidor, y Streamlit Community Cloud es gratis y se despliega solo desde GitHub. Para esa fase faltará decidir: (a) dashboard fijo del grupo vs (b) herramienta pública multi-tenant (usuarios ingresan sus propios handles), porque cambia bastante el diseño — no decidido todavía. También hay riesgo real de rate-limit compartido si varios visitantes corren flujos a la vez desde la misma IP del servidor, y el bypass de Cloudflare vía `curl` en `gym.py` no está garantizado que se comporte igual desde una IP de datacenter — habría que probarlo en vivo.
+- **La consola tiene que seguir funcionando siempre**, leyendo/escribiendo el mismo `config.json`. Diseño acordado: la GUI (y después la web) son capas finas que llaman a las mismas funciones reusables (`find_recommended_abc`, `find_untouched_gyms`, etc.), no una reimplementación paralela.
+
+### Inyección de dependencias para el progreso (2026-10-10)
+
+Antes de esto, el progreso de fetch (qué usuario se está consultando, cuántos aceptados, etc.) se imprimía con `print()` directo adentro de las funciones de fetch — imposible de mostrar en vivo en una GUI sin hackear `sys.stdout`. Se cambió a DI explícita, pedido así por el usuario:
+
+- Toda función de fetch/orquestación reusable (`get_user_solved`, `fetch_problemset` en `app.py`; `fetch_contests`, `fetch_contest_problems`, `fetch_user_ac`, `fetch_user_vjudge_ac`, `fetch_group_solved`, `find_recommended_abc` en `atcoder.py`; `fetch_gym_contests`, `fetch_user_touched_gyms`, `find_untouched_gyms` en `gym.py`) ahora pide `on_progress` como parámetro **obligatorio y keyword-only** (`*, on_progress`) — nada de default a `print` escondido adentro de la función. Quien llama decide la implementación.
+- `main()` de cada módulo (el punto de entrada de consola) es quien inyecta `on_progress=print` — es literalmente la única parte del código que sabe que está corriendo en una terminal. Cuando la GUI llame a estas mismas funciones directo (no a través de `main()`), va a inyectar su propio callback (ej. uno que escriba en el `Multiline` del log) en vez de `print`.
+- Cada mensaje de progreso ahora es una llamada completa a `on_progress(mensaje)` en vez del patrón anterior de `print(..., end="", flush=True)` + un segundo `print()` que completaba la misma línea — se perdió el efecto "aparece antes de terminar la request" en consola, pero a cambio cada call es un mensaje autocontenido, que es lo que necesita cualquier widget de log (una línea nueva por evento, no fragmentos a pegar).
+- `check_editorials`/`select_recommendations`/`has_editorial` en `gym.py` no se tocaron — no tenían ningún `print()` propio que convertir (el único progreso de esa etapa ya vivía en el `=== Checking contest materials ===` de `main()`, que queda como print directo de consola).
+- Probado end-to-end después del cambio: los 3 flujos corrieron limpio (`py main.py codeforces/atcoder/gym`) con el mismo comportamiento visible, solo con el formato de línea ligeramente distinto.
+
+### `input()` reemplazado por error explícito (2026-10-10)
+
+`app.py` pedía usuarios/dificultades por `input()` de consola si `config.json` los tenía vacíos. Eso colgaría una GUI esperando un input que nunca llega, sin ningún mensaje de error visible. Se reemplazó por `raise ValueError(...)` en los 3 módulos (antes `atcoder.py`/`gym.py` solo imprimían un mensaje y hacían `return` silencioso, que tiene el mismo problema de fondo — fallar en silencio en vez de fuerte): si falta `codeforces.users`/`difficulties`, `atcoder.users_atcoder`/`users_vjudge`, o `gym.users`, ahora cada módulo levanta `ValueError` con un mensaje que dice exactamente qué clave de `config.json` falta. Una futura capa de GUI puede capturar `ValueError` de forma uniforme en los 3 flujos y mostrar un messagebox, en vez de necesitar un manejo especial por módulo.
+
+### Esqueleto de `gui.py` (2026-10-10)
+
+Creado con FreeSimpleGUI (`py -m pip install FreeSimpleGUI`, agregado a `requirements.txt`). Es estructura nada más — todavía no está conectado al backend real:
+
+- Una ventana con `TabGroup` de 3 pestañas (Codeforces/AtCoder/Gym), cada una con los campos de su bloque de `config.json` precargados (usuarios, dificultades/count/lookback/problems, filtros de gym) como `sg.Input`/`sg.Checkbox`.
+- Un `sg.Multiline` compartido abajo de las pestañas, pensado como destino del futuro `on_progress`.
+- Un botón "Generar" por pestaña — por ahora el handler del loop de eventos solo escribe una línea de placeholder en el log ("todavía no conectado al backend (esqueleto)"), no llama a ningún flujo real todavía.
+- Probado lanzándolo (`py gui.py` en background): abre sin errores, no se investigó interacción real de click porque no hay forma de probar eso desde este entorno — falta confirmarlo visualmente del lado del usuario.
+
+Pendiente (próximos pasos, no implementado todavía):
+
+1. Conectar cada botón "Generar": leer los campos del tab, armar el dict de config equivalente, y correr la función real del módulo correspondiente (`app.main()`-equivalente, `atcoder.find_recommended_abc(...)`, `gym.find_untouched_gyms(...)` + `select_recommendations(...)`) en un **hilo aparte** — si corre en el hilo principal de Tkinter, la ventana se congela durante el minuto o más que tarda.
+2. El `on_progress` que le pase la GUI a esas funciones tiene que ser thread-safe respecto al widget: lo estándar es que el hilo de trabajo empuje mensajes a una `queue.Queue`, y el loop de eventos de la GUI los vaya sacando con `window.read(timeout=...)` y escribiéndolos en `-LOG-` — no llamar directo a métodos de un widget Tkinter desde otro hilo.
+3. Decidir si el botón "Generar" escribe los valores del formulario de vuelta a `config.json` antes de correr (para que la consola vea los mismos cambios después) o si corre "ad hoc" sin persistir — se discutió en la conversación que la idea original era que la GUI fuera "un `config.json` dinámico", así que probablemente conviene que sí escriba a disco.
+4. Mostrar los resultados en la GUI (tabla o el mismo texto que ya se guarda en el archivo de salida) — más fácil: después de que termine el hilo, leer el archivo de salida (`output_links`/`output_csv`) y mostrarlo, sin tocar las funciones del backend para que devuelvan algo distinto a lo que ya devuelven.

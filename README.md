@@ -14,7 +14,8 @@ ProblemsHunter genera recomendaciones de entrenamiento competitivo (problemas de
 
 | Archivo | Descripción |
 |---|---|
-| `main.py` | Punto de entrada: `py main.py codeforces`, `py main.py atcoder` o `py main.py gym`. |
+| `main.py` | Punto de entrada de consola: `py main.py codeforces`, `py main.py atcoder` o `py main.py gym`. |
+| `gui.py` | Esqueleto de GUI de escritorio (FreeSimpleGUI) — ver "Interfaz gráfica" más abajo. |
 | `app.py` | Genera problemas nuevos de Codeforces consultando su API. |
 | `atcoder.py` | Recomienda AtCoder Beginner Contests recientes sin resolver por el grupo. |
 | `gym.py` | Recomienda gyms de Codeforces sin resolver por el grupo. |
@@ -171,6 +172,18 @@ Nota sobre el chequeo de tutorial/editorial: scrapea `codeforces.com/gym/{id}` c
 1. Editar `config.json`.
 2. Borrar `solved.txt` y `results.txt` si querés empezar de cero.
 3. Ejecutar `py main.py codeforces` (o `atcoder`/`gym`).
+
+## Interfaz gráfica (en construcción)
+
+```powershell
+py gui.py
+```
+
+Por ahora es solo el esqueleto: una ventana con una pestaña por flujo (Codeforces/AtCoder/Gym), los campos precargados desde `config.json`, y un log compartido abajo. Los botones "Generar" todavía no están conectados al backend — falta correr cada flujo en un hilo aparte (para no congelar la ventana durante el minuto o más que tardan las corridas reales) y pasarle un callback de progreso que escriba en el log en vez de usar `print()`.
+
+Esto último ya funciona a nivel de backend: `app.py`, `atcoder.py` y `gym.py` reciben el progreso por inyección de dependencias — las funciones que hacen fetch piden un parámetro `on_progress` obligatorio (nada de `print()` hardcodeado adentro), y es la consola (`main()` de cada módulo) la que decide inyectar `print` como implementación. La GUI va a inyectar su propio callback en vez de `print` cuando se conecte.
+
+También, si falta configuración obligatoria (usuarios o dificultades vacíos), los 3 módulos ahora levantan `ValueError` en vez de pedir input por consola — importante porque un `input()` colgaría la GUI esperando algo que nunca va a llegar por una ventana.
 
 ## Notas importantes
 

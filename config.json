@@ -1,7 +1,7 @@
 {
     "codeforces": {
         "users": ["pacha2880", "PyroxBoy", "AMAMEMIE", "Dilan8787", "__profeta"],
-        "difficulties": ["1900", "1700", "1300", "900", "800"],
+        "difficulties": ["1900", "1900", "1700", "1300", "900", "800"],
         "output_links": "outputs/codeforces_results.txt"
     },
     "atcoder": {
@@ -14,21 +14,17 @@
     },
     "gym": {
         "users": [
-            "__profeta",
-            "Simurdiera_MAC",
-            "Alexander1755",
-            "Dilan8787",
-            "PyroxBoy",
-            "AMAMEMIE",
-            "BrossoICPC"
+            "polyfishy",
+            "alexalvarez123",
+            "Slend"
         ],
         "count": 20,
-        "require_editorial": false,
+        "require_editorial": true,
         "filters": {
             "type": "ICPC",
             "kind": ["Official ICPC Contest"],
             "icpc_region": null,
-            "difficulty_min": 3,
+            "difficulty_min": 4,
             "difficulty_max": 4,
             "duration_min_seconds": 18000,
             "duration_max_seconds": 18000,
