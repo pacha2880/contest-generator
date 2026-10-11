@@ -30,28 +30,28 @@ def load_config(path="config.json"):
         return json.load(f)
 
 
-def fetch_contests():
-    print("Fetching AtCoder contest list...", end="", flush=True)
+def fetch_contests(*, on_progress):
+    on_progress("Fetching AtCoder contest list...")
     r = requests.get(CONTESTS_URL, timeout=30)
     r.raise_for_status()
     contests = r.json()
-    print(f" {len(contests)} contests loaded")
+    on_progress(f"{len(contests)} contests loaded")
     return contests
 
 
-def fetch_contest_problems():
-    print("Fetching contest-problem map...", end="", flush=True)
+def fetch_contest_problems(*, on_progress):
+    on_progress("Fetching contest-problem map...")
     r = requests.get(CONTEST_PROBLEM_URL, timeout=30)
     r.raise_for_status()
     mapping = {}
     for row in r.json():
         mapping.setdefault(row["contest_id"], []).append(row["problem_id"])
-    print(f" {len(mapping)} contests mapped")
+    on_progress(f"{len(mapping)} contests mapped")
     return mapping
 
 
-def fetch_user_ac(user):
-    print(f"  [{user}] fetching submissions...", end="", flush=True)
+def fetch_user_ac(user, *, on_progress):
+    on_progress(f"[{user}] fetching submissions...")
     solved = set()
     from_second = 0
     total = 0
@@ -65,7 +65,7 @@ def fetch_user_ac(user):
             r.raise_for_status()
             batch = r.json()
         except Exception as e:
-            print(f" request failed: {e}")
+            on_progress(f"[{user}] request failed: {e}")
             break
         if not batch:
             break
@@ -77,17 +77,17 @@ def fetch_user_ac(user):
             break
         from_second = batch[-1]["epoch_second"] + 1
         time.sleep(0.3)
-    print(f" {len(solved)} accepted ({total} submissions)")
+    on_progress(f"[{user}] {len(solved)} accepted ({total} submissions)")
     return solved
 
 
-def fetch_user_vjudge_ac(vjudge_user, page_size=100):
+def fetch_user_vjudge_ac(vjudge_user, *, on_progress, page_size=100):
     """Accepted AtCoder problems submitted through vjudge.net's mirror, which
     doesn't show up in kenkoooo's own submissions API. Recognized by probNum
     (== kenkoooo's problem_id) with status "Accepted", filtered server-side
     to OJId=AtCoder. recordsTotal/recordsFiltered in the response are dummy
     sentinel values, not real counts, so pagination stops on a short page."""
-    print(f"  [{vjudge_user}] (vjudge) fetching submissions...", end="", flush=True)
+    on_progress(f"[{vjudge_user}] (vjudge) fetching submissions...")
     solved = set()
     start = 0
     total = 0
@@ -103,7 +103,7 @@ def fetch_user_vjudge_ac(vjudge_user, page_size=100):
             r.raise_for_status()
             rows = r.json().get("data", [])
         except Exception as e:
-            print(f" request failed: {e}")
+            on_progress(f"[{vjudge_user}] request failed: {e}")
             break
         if not rows:
             break
@@ -115,24 +115,24 @@ def fetch_user_vjudge_ac(vjudge_user, page_size=100):
             break
         start += page_size
         time.sleep(0.3)
-    print(f" {len(solved)} accepted ({total} submissions)")
+    on_progress(f"[{vjudge_user}] {len(solved)} accepted ({total} submissions)")
     return solved
 
 
-def fetch_group_solved(users_atcoder, users_vjudge):
+def fetch_group_solved(users_atcoder, users_vjudge, *, on_progress):
     """Two independent handle lists (not required to match in size or to
     correspond 1:1 — a vjudge handle doesn't need a matching AtCoder one and
     vice versa). Unions AtCoder-native submissions from users_atcoder with
     vjudge-mirror submissions from users_vjudge."""
     solved = set()
     for handle in users_atcoder:
-        solved |= fetch_user_ac(handle)
+        solved |= fetch_user_ac(handle, on_progress=on_progress)
     for handle in users_vjudge:
-        solved |= fetch_user_vjudge_ac(handle)
+        solved |= fetch_user_vjudge_ac(handle, on_progress=on_progress)
     return solved
 
 
-def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, problem_letters=None):
+def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, *, on_progress, problem_letters=None):
     """problem_letters: e.g. ["c", "d", "e"] narrows the check from "any
     problem in the contest" to just those letters — a contest is recommended
     if none of THOSE specific problems were solved, even if others were.
@@ -141,7 +141,7 @@ def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, problem_l
     and some borrow problems from ARC) is reported and skipped for that
     contest; if none of the requested letters exist there, the contest is
     skipped entirely — there's nothing matching the filter to recommend."""
-    contests = fetch_contests()
+    contests = fetch_contests(on_progress=on_progress)
     abc_contests = []
     for c in contests:
         m = ABC_RE.match(c["id"])
@@ -150,11 +150,11 @@ def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, problem_l
     abc_contests.sort(key=lambda x: x[0], reverse=True)
     abc_contests = abc_contests[:lookback]
 
-    problem_map = fetch_contest_problems()
+    problem_map = fetch_contest_problems(on_progress=on_progress)
 
-    print("\n=== Fetching user submissions ===")
-    solved = fetch_group_solved(users_atcoder, users_vjudge)
-    print(f"  Total unique accepted problems across all users: {len(solved)}\n")
+    on_progress("=== Fetching user submissions ===")
+    solved = fetch_group_solved(users_atcoder, users_vjudge, on_progress=on_progress)
+    on_progress(f"Total unique accepted problems across all users: {len(solved)}")
 
     recommended = []
     for _, c in abc_contests:
@@ -169,7 +169,7 @@ def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, problem_l
                 if pid in problems:
                     target.append(pid)
                 else:
-                    print(f"  Nota: {c['id']} no tiene problema '{letter.upper()}', se omite para este contest")
+                    on_progress(f"Nota: {c['id']} no tiene problema '{letter.upper()}', se omite para este contest")
             if not target:
                 continue
         else:
@@ -198,8 +198,7 @@ def main():
     problem_letters = [p.lower() for p in ac_cfg.get("problems", [])]
 
     if not users_atcoder and not users_vjudge:
-        print("No hay usuarios configurados en config.json['atcoder']['users_atcoder'/'users_vjudge'].")
-        return
+        raise ValueError("config.json['atcoder']['users_atcoder'/'users_vjudge'] is empty")
 
     print(f"AtCoder users ({len(users_atcoder)}): {', '.join(users_atcoder)}")
     print(f"vjudge users ({len(users_vjudge)}): {', '.join(users_vjudge)}")
@@ -209,7 +208,10 @@ def main():
         output_path = f"{base}_{'-'.join(p.upper() for p in problem_letters)}{ext}"
     print(f"Looking back {lookback} most recent ABCs, recommending up to {count}.\n")
 
-    recommended = find_recommended_abc(users_atcoder, users_vjudge, count, lookback, problem_letters)
+    recommended = find_recommended_abc(
+        users_atcoder, users_vjudge, count, lookback,
+        on_progress=print, problem_letters=problem_letters,
+    )
 
     print(f"=== Recommended ABCs ({len(recommended)}/{count}) ===")
     links = []

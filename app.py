@@ -16,10 +16,10 @@ def load_config(path="config.json"):
         return json.load(f)
 
 
-def get_user_solved(users):
+def get_user_solved(users, *, on_progress):
     solved = set()
     for user in users:
-        print(f"  [{user}] fetching submissions...", end="", flush=True)
+        on_progress(f"[{user}] fetching submissions...")
         try:
             r = requests.get(
                 f"{CF_API}/user.status",
@@ -34,17 +34,17 @@ def get_user_solved(users):
                         p = sub["problem"]
                         solved.add(f"{p['contestId']}{p['index']}")
                         count += 1
-                print(f" {count} accepted")
+                on_progress(f"[{user}] {count} accepted")
             else:
-                print(f" API error: {data.get('comment', '?')}")
+                on_progress(f"[{user}] API error: {data.get('comment', '?')}")
         except Exception as e:
-            print(f" request failed: {e}")
+            on_progress(f"[{user}] request failed: {e}")
         time.sleep(0.3)
     return solved
 
 
-def fetch_problemset():
-    print("Fetching full problemset from Codeforces API...", end="", flush=True)
+def fetch_problemset(*, on_progress):
+    on_progress("Fetching full problemset from Codeforces API...")
     r = requests.get(f"{CF_API}/problemset.problems", timeout=30)
     data = r.json()
     if data["status"] != "OK":
@@ -55,7 +55,7 @@ def fetch_problemset():
         for s in data["result"]["problemStatistics"]
         if "contestId" in s
     }
-    print(f" {len(problems)} problems loaded")
+    on_progress(f"{len(problems)} problems loaded")
     return problems, stats
 
 
@@ -106,12 +106,10 @@ def main():
     output_path = cf_cfg.get("output_links", "results.txt")
 
     if not users:
-        raw = input("Enter usernames (space-separated): ")
-        users = raw.strip().split()
+        raise ValueError("config.json['codeforces']['users'] is empty")
 
     if not diff_list:
-        raw = input("Enter difficulty ratings (space-separated): ")
-        diff_list = raw.strip().split()
+        raise ValueError("config.json['codeforces']['difficulties'] is empty")
 
     diff_count = Counter(int(d) for d in diff_list)
 
@@ -122,11 +120,11 @@ def main():
     print()
 
     print("=== Step 1: Collecting solved problems ===")
-    user_solved = get_user_solved(users)
+    user_solved = get_user_solved(users, on_progress=print)
     print(f"  Total unique accepted problems across all users: {len(user_solved)}\n")
 
     print("=== Step 2: Fetching problemset ===")
-    problems, stats = fetch_problemset()
+    problems, stats = fetch_problemset(on_progress=print)
     print()
 
     past = load_past()

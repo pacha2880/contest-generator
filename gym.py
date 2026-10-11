@@ -29,14 +29,14 @@ def load_config(path="config.json"):
         return json.load(f)
 
 
-def fetch_gym_contests():
-    print("Fetching gym contest list...", end="", flush=True)
+def fetch_gym_contests(*, on_progress):
+    on_progress("Fetching gym contest list...")
     r = requests.get(f"{CF_API}/contest.list", params={"gym": "true"}, timeout=30)
     data = r.json()
     if data["status"] != "OK":
         raise RuntimeError(f"contest.list error: {data.get('comment')}")
     contests = data["result"]
-    print(f" {len(contests)} gyms loaded")
+    on_progress(f"{len(contests)} gyms loaded")
     return contests
 
 
@@ -80,10 +80,10 @@ def matches_filters(contest, filters):
     return True
 
 
-def fetch_user_touched_gyms(user):
+def fetch_user_touched_gyms(user, *, on_progress):
     """Gym submissions show up in the normal user.status history; their
     contestId is just >= GYM_ID_MIN. Any verdict counts as "touched"."""
-    print(f"  [{user}] fetching submissions...", end="", flush=True)
+    on_progress(f"[{user}] fetching submissions...")
     touched = set()
     try:
         r = requests.get(
@@ -97,27 +97,27 @@ def fetch_user_touched_gyms(user):
                 contest_id = sub.get("contestId")
                 if contest_id is not None and contest_id >= GYM_ID_MIN:
                     touched.add(contest_id)
-            print(f" {len(touched)} gyms touched")
+            on_progress(f"[{user}] {len(touched)} gyms touched")
         else:
-            print(f" API error: {data.get('comment', '?')}")
+            on_progress(f"[{user}] API error: {data.get('comment', '?')}")
     except Exception as e:
-        print(f" request failed: {e}")
+        on_progress(f"[{user}] request failed: {e}")
     time.sleep(0.3)
     return touched
 
 
-def find_untouched_gyms(users, filters):
+def find_untouched_gyms(users, filters, *, on_progress):
     """All gyms matching the metadata filters that no user has touched,
     sorted most recent first. Not yet trimmed to `count`."""
-    contests = fetch_gym_contests()
+    contests = fetch_gym_contests(on_progress=on_progress)
     candidates = [c for c in contests if matches_filters(c, filters)]
-    print(f"{len(candidates)}/{len(contests)} gyms match the configured filters\n")
+    on_progress(f"{len(candidates)}/{len(contests)} gyms match the configured filters")
 
-    print("=== Fetching user submissions ===")
+    on_progress("=== Fetching user submissions ===")
     touched = set()
     for user in users:
-        touched |= fetch_user_touched_gyms(user)
-    print(f"  Gyms touched by the group: {len(touched)}\n")
+        touched |= fetch_user_touched_gyms(user, on_progress=on_progress)
+    on_progress(f"Gyms touched by the group: {len(touched)}")
 
     untouched = [c for c in candidates if c["id"] not in touched]
     untouched.sort(key=lambda c: c.get("startTimeSeconds", 0), reverse=True)
@@ -202,8 +202,7 @@ def main():
     output_path = gym_cfg.get("output_csv", "outputs/gym_recommendations.csv")
 
     if not users:
-        print("No hay usuarios configurados en config.json['gym']['users'].")
-        return
+        raise ValueError("config.json['gym']['users'] is empty")
 
     print(f"Users ({len(users)}): {', '.join(users)}")
     print(f"Filters: {filters}")
@@ -212,7 +211,7 @@ def main():
     else:
         print(f"Recommending up to {count} gyms.\n")
 
-    untouched = find_untouched_gyms(users, filters)
+    untouched = find_untouched_gyms(users, filters, on_progress=print)
 
     print(f"=== Checking contest materials ({'required' if require_editorial else 'informational'}) ===")
     recommended, editorials = select_recommendations(untouched, count, require_editorial)
