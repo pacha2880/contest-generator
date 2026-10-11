@@ -9,6 +9,8 @@ import time
 
 import requests
 
+from cancel import StoppedByUser
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 CF_API = "https://codeforces.com/api"
@@ -106,7 +108,7 @@ def fetch_user_touched_gyms(user, *, on_progress):
     return touched
 
 
-def find_untouched_gyms(users, filters, *, on_progress):
+def find_untouched_gyms(users, filters, *, on_progress, should_stop=lambda: False):
     """All gyms matching the metadata filters that no user has touched,
     sorted most recent first. Not yet trimmed to `count`."""
     contests = fetch_gym_contests(on_progress=on_progress)
@@ -116,6 +118,9 @@ def find_untouched_gyms(users, filters, *, on_progress):
     on_progress("=== Fetching user submissions ===")
     touched = set()
     for user in users:
+        if should_stop():
+            on_progress("Detenido por el usuario.")
+            raise StoppedByUser()
         touched |= fetch_user_touched_gyms(user, on_progress=on_progress)
     on_progress(f"Gyms touched by the group: {len(touched)}")
 
@@ -153,17 +158,20 @@ def has_editorial(contest_id, cookie_jar):
         return None
 
 
-def check_editorials(recommended):
+def check_editorials(recommended, *, on_progress, should_stop=lambda: False):
     editorials = {}
     with tempfile.TemporaryDirectory() as tmp_dir:
         cookie_jar = os.path.join(tmp_dir, "cf_cookies.txt")
         for contest in recommended:
+            if should_stop():
+                on_progress("Detenido por el usuario.")
+                raise StoppedByUser()
             editorials[contest["id"]] = has_editorial(contest["id"], cookie_jar)
             time.sleep(0.9)
     return editorials
 
 
-def select_recommendations(untouched, count, require_editorial):
+def select_recommendations(untouched, count, require_editorial, *, on_progress, should_stop=lambda: False):
     """Without require_editorial, just takes the top `count` and checks their
     editorial status afterwards for display only (current behavior).
 
@@ -174,7 +182,7 @@ def select_recommendations(untouched, count, require_editorial):
     reached or candidates run out."""
     if not require_editorial:
         recommended = untouched[:count]
-        editorials = check_editorials(recommended)
+        editorials = check_editorials(recommended, on_progress=on_progress, should_stop=should_stop)
         return recommended, editorials
 
     recommended = []
@@ -184,6 +192,9 @@ def select_recommendations(untouched, count, require_editorial):
         for contest in untouched:
             if len(recommended) >= count:
                 break
+            if should_stop():
+                on_progress("Detenido por el usuario.")
+                raise StoppedByUser()
             found = has_editorial(contest["id"], cookie_jar)
             time.sleep(0.9)
             if found:
@@ -192,7 +203,10 @@ def select_recommendations(untouched, count, require_editorial):
     return recommended, editorials
 
 
-def main():
+def main(on_progress=print, should_stop=lambda: False):
+    """on_progress defaults to print for the console entry point. The GUI
+    calls this same function with its own callback instead, sharing the
+    exact same logic, output files, and config.json reading."""
     cfg = load_config()
     gym_cfg = cfg.get("gym", {})
     users = gym_cfg.get("users", [])
@@ -204,19 +218,21 @@ def main():
     if not users:
         raise ValueError("config.json['gym']['users'] is empty")
 
-    print(f"Users ({len(users)}): {', '.join(users)}")
-    print(f"Filters: {filters}")
+    on_progress(f"Users ({len(users)}): {', '.join(users)}")
+    on_progress(f"Filters: {filters}")
     if require_editorial:
-        print(f"Recommending up to {count} gyms that have a tutorial/editorial.\n")
+        on_progress(f"Recommending up to {count} gyms that have a tutorial/editorial.")
     else:
-        print(f"Recommending up to {count} gyms.\n")
+        on_progress(f"Recommending up to {count} gyms.")
 
-    untouched = find_untouched_gyms(users, filters, on_progress=print)
+    untouched = find_untouched_gyms(users, filters, on_progress=on_progress, should_stop=should_stop)
 
-    print(f"=== Checking contest materials ({'required' if require_editorial else 'informational'}) ===")
-    recommended, editorials = select_recommendations(untouched, count, require_editorial)
+    on_progress(f"=== Checking contest materials ({'required' if require_editorial else 'informational'}) ===")
+    recommended, editorials = select_recommendations(
+        untouched, count, require_editorial, on_progress=on_progress, should_stop=should_stop,
+    )
 
-    print(f"\n=== Recommended gyms ({len(recommended)}/{count}) ===")
+    on_progress(f"=== Recommended gyms ({len(recommended)}/{count}) ===")
     rows = []
     for contest in recommended:
         link = f"https://codeforces.com/gym/{contest['id']}"
@@ -234,7 +250,7 @@ def main():
             "editorial": editorial,
             "link": link,
         })
-        print(f"  {stars(contest.get('difficulty'))}  {contest['id']}  |  {contest['name']}  |  editorial: {editorial}  |  {link}")
+        on_progress(f"  {stars(contest.get('difficulty'))}  {contest['id']}  |  {contest['name']}  |  editorial: {editorial}  |  {link}")
 
     out_dir = os.path.dirname(output_path)
     if out_dir:
@@ -244,7 +260,7 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"\nSaved {len(rows)} rows to {output_path}")
+    on_progress(f"Saved {len(rows)} rows to {output_path}")
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@ import time
 import requests
 from collections import Counter
 
+from cancel import StoppedByUser
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 CF_API = "https://codeforces.com/api"
@@ -16,9 +18,12 @@ def load_config(path="config.json"):
         return json.load(f)
 
 
-def get_user_solved(users, *, on_progress):
+def get_user_solved(users, *, on_progress, should_stop=lambda: False):
     solved = set()
     for user in users:
+        if should_stop():
+            on_progress("Detenido por el usuario.")
+            raise StoppedByUser()
         on_progress(f"[{user}] fetching submissions...")
         try:
             r = requests.get(
@@ -98,7 +103,11 @@ def find_unsolved(problems, stats, rating, user_solved, past, count):
     return candidates[:count]
 
 
-def main():
+def main(on_progress=print, should_stop=lambda: False):
+    """on_progress defaults to print for the console entry point (`py main.py
+    codeforces` / `python app.py`). The GUI calls this same function with its
+    own callback instead, so both share the exact same logic, output files,
+    and config.json reading — no separate codepath to keep in sync."""
     cfg = load_config()
     cf_cfg = cfg.get("codeforces", {})
     users = cf_cfg.get("users", [])
@@ -113,24 +122,22 @@ def main():
 
     diff_count = Counter(int(d) for d in diff_list)
 
-    print(f"\nUsers ({len(users)}): {', '.join(users)}")
-    print("Problems needed per difficulty:")
+    on_progress(f"Users ({len(users)}): {', '.join(users)}")
+    on_progress("Problems needed per difficulty:")
     for r, c in sorted(diff_count.items(), reverse=True):
-        print(f"  {r}: {c}")
-    print()
+        on_progress(f"  {r}: {c}")
 
-    print("=== Step 1: Collecting solved problems ===")
-    user_solved = get_user_solved(users, on_progress=print)
-    print(f"  Total unique accepted problems across all users: {len(user_solved)}\n")
+    on_progress("=== Step 1: Collecting solved problems ===")
+    user_solved = get_user_solved(users, on_progress=on_progress, should_stop=should_stop)
+    on_progress(f"Total unique accepted problems across all users: {len(user_solved)}")
 
-    print("=== Step 2: Fetching problemset ===")
-    problems, stats = fetch_problemset(on_progress=print)
-    print()
+    on_progress("=== Step 2: Fetching problemset ===")
+    problems, stats = fetch_problemset(on_progress=on_progress)
 
     past = load_past()
-    print(f"Previously recommended (skipped): {len(past)}\n")
+    on_progress(f"Previously recommended (skipped): {len(past)}")
 
-    print("=== Results ===\n")
+    on_progress("=== Results ===")
     newly_recommended = []
     result_lines = []
 
@@ -138,19 +145,18 @@ def main():
         needed = diff_count[rating]
         found = find_unsolved(problems, stats, rating, user_solved, past, needed)
 
-        print(f"[{rating}] {len(found)}/{needed} problems:")
+        on_progress(f"[{rating}] {len(found)}/{needed} problems:")
         result_lines.append(f"[{rating}] {len(found)}/{needed} problems:")
         for p in found:
             line = f"  [{rating}] {p['url']}  |  {p['name']}  (solved by {p['solvedCount']} on CF)"
-            print(line)
+            on_progress(line)
             result_lines.append(line)
             newly_recommended.append(p["key"])
 
         if len(found) < needed:
             note = f"  (only {len(found)} unsolved problems available at this rating)"
-            print(note)
+            on_progress(note)
             result_lines.append(note)
-        print()
         result_lines.append("")
 
     out_dir = os.path.dirname(output_path)
@@ -160,8 +166,8 @@ def main():
         f.write("\n".join(result_lines))
 
     save_past(newly_recommended)
-    print(f"Saved {len(newly_recommended)} problems to {PAST_FILE}.")
-    print(f"Full results saved to {output_path}")
+    on_progress(f"Saved {len(newly_recommended)} problems to {PAST_FILE}.")
+    on_progress(f"Full results saved to {output_path}")
 
 
 if __name__ == "__main__":

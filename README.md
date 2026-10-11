@@ -15,7 +15,7 @@ ProblemsHunter genera recomendaciones de entrenamiento competitivo (problemas de
 | Archivo | Descripción |
 |---|---|
 | `main.py` | Punto de entrada de consola: `py main.py codeforces`, `py main.py atcoder` o `py main.py gym`. |
-| `gui.py` | Esqueleto de GUI de escritorio (FreeSimpleGUI) — ver "Interfaz gráfica" más abajo. |
+| `gui.py` | GUI de escritorio (FreeSimpleGUI) — ver "Interfaz gráfica" más abajo. |
 | `app.py` | Genera problemas nuevos de Codeforces consultando su API. |
 | `atcoder.py` | Recomienda AtCoder Beginner Contests recientes sin resolver por el grupo. |
 | `gym.py` | Recomienda gyms de Codeforces sin resolver por el grupo. |
@@ -173,17 +173,26 @@ Nota sobre el chequeo de tutorial/editorial: scrapea `codeforces.com/gym/{id}` c
 2. Borrar `solved.txt` y `results.txt` si querés empezar de cero.
 3. Ejecutar `py main.py codeforces` (o `atcoder`/`gym`).
 
-## Interfaz gráfica (en construcción)
+## Interfaz gráfica
 
 ```powershell
 py gui.py
 ```
 
-Por ahora es solo el esqueleto: una ventana con una pestaña por flujo (Codeforces/AtCoder/Gym), los campos precargados desde `config.json`, y un log compartido abajo. Los botones "Generar" todavía no están conectados al backend — falta correr cada flujo en un hilo aparte (para no congelar la ventana durante el minuto o más que tardan las corridas reales) y pasarle un callback de progreso que escriba en el log en vez de usar `print()`.
+Ventana con una pestaña por flujo (Codeforces/AtCoder/Gym), campos precargados desde `config.json`, y un log compartido abajo. Al apretar "Generar":
 
-Esto último ya funciona a nivel de backend: `app.py`, `atcoder.py` y `gym.py` reciben el progreso por inyección de dependencias — las funciones que hacen fetch piden un parámetro `on_progress` obligatorio (nada de `print()` hardcodeado adentro), y es la consola (`main()` de cada módulo) la que decide inyectar `print` como implementación. La GUI va a inyectar su propio callback en vez de `print` cuando se conecte.
+1. Relee `config.json` del disco, actualiza **solo el bloque de ese flujo** con los valores del formulario, y lo guarda — la consola (`py main.py codeforces`/`atcoder`/`gym`) ve los mismos cambios después. Si algún campo no parsea (ej. "Count" con texto en vez de un número), no se guarda nada y se muestra el error.
+2. Corre el mismo `app.main()`/`atcoder.main()`/`gym.main()` que usa la consola — misma lógica, mismos archivos de salida (`results.txt`, `outputs/atcoder_links...txt`, `outputs/gym_recommendations.csv`), sin código duplicado — pero inyectándole su propio callback de progreso en vez de `print`.
+3. Esa corrida va en un hilo aparte (las corridas reales tardan entre 15s y un par de minutos) para no congelar la ventana; el callback usa `window.write_event_value()`, que es thread-safe, en vez de tocar el widget del log directo desde el hilo.
 
-También, si falta configuración obligatoria (usuarios o dificultades vacíos), los 3 módulos ahora levantan `ValueError` en vez de pedir input por consola — importante porque un `input()` colgaría la GUI esperando algo que nunca va a llegar por una ventana.
+Los 3 botones "Generar" se deshabilitan mientras cualquiera de los 3 está corriendo, para no pisarse escribiendo `config.json` al mismo tiempo. También hay dos botones compartidos arriba del log:
+
+- **Detener**: pide que la corrida actual pare. No es instantáneo — Python no puede matar un hilo a la fuerza, así que se le avisa con una señal (`cancel.StoppedByUser`) que se revisa entre cada usuario/contest/gym procesado, y frena ahí. Si para, **no se genera ningún archivo** (ni `results.txt`, ni `solved.txt`, ni el CSV/links de salida) — se corta antes de escribir nada, justamente porque los datos quedarían incompletos.
+- **Limpiar**: vacía el log. No afecta ninguna corrida en curso.
+
+Esto se apoya en tres cambios de `app.py`/`atcoder.py`/`gym.py`: el progreso se reporta por inyección de dependencias (`on_progress`, con `print` como default para que la consola no cambie nada), si falta configuración obligatoria los 3 módulos levantan `ValueError` en vez de pedir `input()` por consola (un `input()` colgaría la GUI esperando algo que nunca va a llegar), y los loops largos (fetch por usuario, chequeo de editorial por gym) aceptan un `should_stop` opcional que, si da `True`, corta ahí mismo.
+
+Nota: como `gui.py` reescribe `config.json` entero con `json.dump(..., indent=4)` cada vez que guarda, el archivo va a quedar reformateado (arrays multilínea) la primera vez que uses la GUI, aunque el contenido sea el mismo.
 
 ## Notas importantes
 

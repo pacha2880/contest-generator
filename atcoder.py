@@ -6,6 +6,8 @@ import time
 
 import requests
 
+from cancel import StoppedByUser
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 CONTESTS_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
@@ -119,20 +121,26 @@ def fetch_user_vjudge_ac(vjudge_user, *, on_progress, page_size=100):
     return solved
 
 
-def fetch_group_solved(users_atcoder, users_vjudge, *, on_progress):
+def fetch_group_solved(users_atcoder, users_vjudge, *, on_progress, should_stop=lambda: False):
     """Two independent handle lists (not required to match in size or to
     correspond 1:1 — a vjudge handle doesn't need a matching AtCoder one and
     vice versa). Unions AtCoder-native submissions from users_atcoder with
     vjudge-mirror submissions from users_vjudge."""
     solved = set()
     for handle in users_atcoder:
+        if should_stop():
+            on_progress("Detenido por el usuario.")
+            raise StoppedByUser()
         solved |= fetch_user_ac(handle, on_progress=on_progress)
     for handle in users_vjudge:
+        if should_stop():
+            on_progress("Detenido por el usuario.")
+            raise StoppedByUser()
         solved |= fetch_user_vjudge_ac(handle, on_progress=on_progress)
     return solved
 
 
-def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, *, on_progress, problem_letters=None):
+def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, *, on_progress, problem_letters=None, should_stop=lambda: False):
     """problem_letters: e.g. ["c", "d", "e"] narrows the check from "any
     problem in the contest" to just those letters — a contest is recommended
     if none of THOSE specific problems were solved, even if others were.
@@ -153,11 +161,14 @@ def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, *, on_pro
     problem_map = fetch_contest_problems(on_progress=on_progress)
 
     on_progress("=== Fetching user submissions ===")
-    solved = fetch_group_solved(users_atcoder, users_vjudge, on_progress=on_progress)
+    solved = fetch_group_solved(users_atcoder, users_vjudge, on_progress=on_progress, should_stop=should_stop)
     on_progress(f"Total unique accepted problems across all users: {len(solved)}")
 
     recommended = []
     for _, c in abc_contests:
+        if should_stop():
+            on_progress("Detenido por el usuario.")
+            raise StoppedByUser()
         problems = problem_map.get(c["id"], [])
         if not problems:
             continue
@@ -187,7 +198,10 @@ def build_link(contest_id):
     return f"https://atcoder.jp/contests/{contest_id}"
 
 
-def main():
+def main(on_progress=print, should_stop=lambda: False):
+    """on_progress defaults to print for the console entry point. The GUI
+    calls this same function with its own callback instead, sharing the
+    exact same logic, output files, and config.json reading."""
     cfg = load_config()
     ac_cfg = cfg.get("atcoder", {})
     users_atcoder = ac_cfg.get("users_atcoder", [])
@@ -200,25 +214,25 @@ def main():
     if not users_atcoder and not users_vjudge:
         raise ValueError("config.json['atcoder']['users_atcoder'/'users_vjudge'] is empty")
 
-    print(f"AtCoder users ({len(users_atcoder)}): {', '.join(users_atcoder)}")
-    print(f"vjudge users ({len(users_vjudge)}): {', '.join(users_vjudge)}")
+    on_progress(f"AtCoder users ({len(users_atcoder)}): {', '.join(users_atcoder)}")
+    on_progress(f"vjudge users ({len(users_vjudge)}): {', '.join(users_vjudge)}")
     if problem_letters:
-        print(f"Filtering to problems: {', '.join(p.upper() for p in problem_letters)}")
+        on_progress(f"Filtering to problems: {', '.join(p.upper() for p in problem_letters)}")
         base, ext = os.path.splitext(output_path)
         output_path = f"{base}_{'-'.join(p.upper() for p in problem_letters)}{ext}"
-    print(f"Looking back {lookback} most recent ABCs, recommending up to {count}.\n")
+    on_progress(f"Looking back {lookback} most recent ABCs, recommending up to {count}.")
 
     recommended = find_recommended_abc(
         users_atcoder, users_vjudge, count, lookback,
-        on_progress=print, problem_letters=problem_letters,
+        on_progress=on_progress, problem_letters=problem_letters, should_stop=should_stop,
     )
 
-    print(f"=== Recommended ABCs ({len(recommended)}/{count}) ===")
+    on_progress(f"=== Recommended ABCs ({len(recommended)}/{count}) ===")
     links = []
     for c in recommended:
         link = build_link(c["id"])
         links.append(link)
-        print(f"  {c['id']}  |  {c['title']}  |  {link}")
+        on_progress(f"  {c['id']}  |  {c['title']}  |  {link}")
 
     out_dir = os.path.dirname(output_path)
     if out_dir:
@@ -227,7 +241,7 @@ def main():
         for link in links:
             f.write(link + "\n")
 
-    print(f"\nSaved {len(links)} links to {output_path}")
+    on_progress(f"Saved {len(links)} links to {output_path}")
 
 
 if __name__ == "__main__":

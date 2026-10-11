@@ -1,15 +1,38 @@
 {
     "codeforces": {
-        "users": ["pacha2880", "PyroxBoy", "AMAMEMIE", "Dilan8787", "__profeta"],
-        "difficulties": ["1900", "1900", "1700", "1300", "900", "800"],
+        "users": [
+            "pacha2880",
+            "PyroxBoy",
+            "AMAMEMIE",
+            "Dilan8787",
+            "__profeta"
+        ],
+        "difficulties": [
+            "1900",
+            "1900",
+            "1700",
+            "1300",
+            "900",
+            "800"
+        ],
         "output_links": "outputs/codeforces_results.txt"
     },
     "atcoder": {
-        "users_atcoder": ["profetaR", "Simurdiera", "dylan_becerra"],
-        "users_vjudge": ["est_chavarria", "Simurdiera_MAC", "dylan_becerra"],
+        "users_atcoder": [
+            "profetaR",
+            "Simurdiera",
+            "dylan_becerra"
+        ],
+        "users_vjudge": [
+            "est_chavarria",
+            "Simurdiera_MAC",
+            "dylan_becerra"
+        ],
         "count": 9,
         "lookback": 100,
-        "problems": ["f"],
+        "problems": [
+            "f"
+        ],
         "output_links": "outputs/atcoder_links.txt"
     },
     "gym": {
@@ -22,7 +45,9 @@
         "require_editorial": true,
         "filters": {
             "type": "ICPC",
-            "kind": ["Official ICPC Contest"],
+            "kind": [
+                "Official ICPC Contest"
+            ],
             "icpc_region": null,
             "difficulty_min": 4,
             "difficulty_max": 4,
