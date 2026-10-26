@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProblemsHunter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>ProblemsHunter</h1>
+    <form method="post" action="/logout"><button type="submit" class="link-btn">Salir</button></form>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="codeforces">Codeforces</button>
+    <button class="tab-btn" data-tab="atcoder">AtCoder</button>
+    <button class="tab-btn" data-tab="gym">Gym</button>
+    <button class="tab-btn" data-tab="saved">Listas guardadas</button>
+  </nav>
+
+  <!-- ===================== Codeforces ===================== -->
+  <section class="tab-panel active" id="panel-codeforces">
+    <form class="run-form" data-flow="codeforces">
+      <div class="config-bar">
+        <select class="config-select"><option value="">— Cargar configuración guardada —</option></select>
+        <button type="button" class="load-config-btn">Cargar</button>
+        <button type="button" class="delete-config-btn" title="Borrar configuración seleccionada">🗑</button>
+        <button type="button" class="save-config-btn">Guardar configuración actual</button>
+      </div>
+
+      <label>Usuarios</label>
+      <div class="user-picker" data-field="users">
+        <div class="chips"></div>
+        <div class="picker-input-row">
+          <input type="text" list="dl-cf-users" placeholder="handle">
+          <button type="button" class="add-user-btn" title="Agregar usuario">+</button>
+        </div>
+      </div>
+      <datalist id="dl-cf-users"></datalist>
+
+      <label>Usuarios (vjudge)</label>
+      <div class="user-picker" data-field="users_vjudge">
+        <div class="chips"></div>
+        <div class="picker-input-row">
+          <input type="text" list="dl-vj-users" placeholder="handle_vj">
+          <button type="button" class="add-user-btn" title="Agregar usuario">+</button>
+        </div>
+      </div>
+
+      <label>Modo
+        <select name="mode" class="mode-select">
+          <option value="difficulties">Por rating</option>
+          <option value="letters">Por letra</option>
+        </select>
+      </label>
+
+      <label class="mode-field mode-difficulties">Dificultades <input name="difficulties" placeholder="1900, 1900, 1700, 1300, 900, 800"></label>
+
+      <label class="mode-field mode-letters" hidden>Letras <input name="letters" placeholder="C, C, D"></label>
+      <label class="mode-field mode-letters" hidden>Tipo de ronda
+        <select name="round_type">
+          <option value="div2">Div.2 (incluye Div.1+2 y Educational)</option>
+          <option value="div1">Div.1</option>
+          <option value="div3">Div.3</option>
+          <option value="div4">Div.4</option>
+        </select>
+      </label>
+
+      <label>Título para guardar <input name="title" placeholder="opcional"></label>
+
+      <div class="run-controls">
+        <button type="submit" class="run-btn">Generar</button>
+        <button type="button" class="stop-btn" disabled>Detener</button>
+      </div>
+    </form>
+    <pre class="log"></pre>
+    <div class="results"></div>
+  </section>
+
+  <!-- ===================== AtCoder ===================== -->
+  <section class="tab-panel" id="panel-atcoder">
+    <form class="run-form" data-flow="atcoder">
+      <div class="config-bar">
+        <select class="config-select"><option value="">— Cargar configuración guardada —</option></select>
+        <button type="button" class="load-config-btn">Cargar</button>
+        <button type="button" class="delete-config-btn" title="Borrar configuración seleccionada">🗑</button>
+        <button type="button" class="save-config-btn">Guardar configuración actual</button>
+      </div>
+
+      <label>Usuarios (AtCoder)</label>
+      <div class="user-picker" data-field="users_atcoder">
+        <div class="chips"></div>
+        <div class="picker-input-row">
+          <input type="text" list="dl-ac-users" placeholder="handle">
+          <button type="button" class="add-user-btn" title="Agregar usuario">+</button>
+        </div>
+      </div>
+      <datalist id="dl-ac-users"></datalist>
+
+      <label>Usuarios (vjudge)</label>
+      <div class="user-picker" data-field="users_vjudge">
+        <div class="chips"></div>
+        <div class="picker-input-row">
+          <input type="text" list="dl-vj-users" placeholder="handle_vj">
+          <button type="button" class="add-user-btn" title="Agregar usuario">+</button>
+        </div>
+      </div>
+      <datalist id="dl-vj-users"></datalist>
+
+      <label>Cantidad <input type="number" name="count" value="5" min="1"></label>
+      <label>Lookback <input type="number" name="lookback" value="50" min="1"></label>
+      <label>Problemas (letras, opcional) <input name="problems" placeholder="C, D"></label>
+      <label>Título para guardar <input name="title" placeholder="opcional"></label>
+
+      <div class="run-controls">
+        <button type="submit" class="run-btn">Generar</button>
+        <button type="button" class="stop-btn" disabled>Detener</button>
+      </div>
+    </form>
+    <pre class="log"></pre>
+    <div class="results"></div>
+  </section>
+
+  <!-- ===================== Gym ===================== -->
+  <section class="tab-panel" id="panel-gym">
+    <form class="run-form" data-flow="gym">
+      <div class="config-bar">
+        <select class="config-select"><option value="">— Cargar configuración guardada —</option></select>
+        <button type="button" class="load-config-btn">Cargar</button>
+        <button type="button" class="delete-config-btn" title="Borrar configuración seleccionada">🗑</button>
+        <button type="button" class="save-config-btn">Guardar configuración actual</button>
+      </div>
+
+      <label>Usuarios</label>
+      <div class="user-picker" data-field="users">
+        <div class="chips"></div>
+        <div class="picker-input-row">
+          <input type="text" list="dl-gym-users" placeholder="handle">
+          <button type="button" class="add-user-btn" title="Agregar usuario">+</button>
+        </div>
+      </div>
+      <datalist id="dl-gym-users"></datalist>
+
+      <label>Usuarios (vjudge)</label>
+      <div class="user-picker" data-field="users_vjudge">
+        <div class="chips"></div>
+        <div class="picker-input-row">
+          <input type="text" list="dl-vj-users" placeholder="handle_vj">
+          <button type="button" class="add-user-btn" title="Agregar usuario">+</button>
+        </div>
+      </div>
+
+      <label>Cantidad <input type="number" name="count" value="10" min="1"></label>
+      <label><input type="checkbox" name="require_editorial"> Requerir tutorial/editorial</label>
+      <label>Dificultad mínima <input type="number" name="difficulty_min" min="1" max="5"></label>
+      <label>Dificultad máxima <input type="number" name="difficulty_max" min="1" max="5"></label>
+      <label>Título para guardar <input name="title" placeholder="opcional"></label>
+
+      <div class="run-controls">
+        <button type="submit" class="run-btn">Generar</button>
+        <button type="button" class="stop-btn" disabled>Detener</button>
+      </div>
+    </form>
+    <pre class="log"></pre>
+    <div class="results"></div>
+  </section>
+
+  <!-- ===================== Listas guardadas ===================== -->
+  <section class="tab-panel" id="panel-saved">
+    <div class="saved-filter">
+      <label>Filtrar por flujo
+        <select id="saved-flow-filter">
+          <option value="">Todas</option>
+          <option value="codeforces">Codeforces</option>
+          <option value="atcoder">AtCoder</option>
+          <option value="gym">Gym</option>
+        </select>
+      </label>
+    </div>
+    <div id="saved-list"></div>
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

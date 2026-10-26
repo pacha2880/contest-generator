@@ -4,7 +4,7 @@ ProblemsHunter genera recomendaciones de entrenamiento competitivo (problemas de
 
 ## Qué hace
 
-- Consulta las APIs públicas de Codeforces y AtCoder (más el endpoint interno de vjudge.net para submissions de AtCoder vía su mirror).
+- Consulta las APIs públicas de Codeforces y AtCoder (más el endpoint interno de vjudge.net para submissions de Codeforces/AtCoder vía su mirror).
 - Revisa los envíos aceptados de todos los handles del grupo.
 - Filtra problemas/contests no resueltos por nadie según la configuración de cada flujo.
 - Evita repetir problemas usando una cache local en `solved.txt`.
@@ -16,6 +16,10 @@ ProblemsHunter genera recomendaciones de entrenamiento competitivo (problemas de
 |---|---|
 | `main.py` | Punto de entrada de consola: `py main.py codeforces`, `py main.py atcoder` o `py main.py gym`. |
 | `gui.py` | GUI de escritorio (FreeSimpleGUI) — ver "Interfaz gráfica" más abajo. |
+| `server.py` | Backend web (FastAPI) — ver "Backend web" más abajo. |
+| `db.py` | Persistencia en MongoDB (usuarios recordados, listas guardadas) para `server.py`. |
+| `auth.py` | Login de contraseña compartida para `server.py`. |
+| `cancel.py` | `StoppedByUser`, usada por los 3 módulos core y por `gui.py`/`server.py` para cancelar una corrida en curso. |
 | `app.py` | Genera problemas nuevos de Codeforces consultando su API. |
 | `atcoder.py` | Recomienda AtCoder Beginner Contests recientes sin resolver por el grupo. |
 | `gym.py` | Recomienda gyms de Codeforces sin resolver por el grupo. |
@@ -46,15 +50,25 @@ El archivo `config.json` tiene esta forma:
 {
     "codeforces": {
         "users": ["handle1", "handle2"],
+        "users_vjudge": [],
         "difficulties": ["1900", "1900", "1800", "1700", "1700", "1300", "1300", "900", "900", "800"],
+        "letters": [],
+        "type": "div2",
+        "mode": "difficulties",
         "output_links": "outputs/codeforces_results.txt"
     }
 }
 ```
 
 - `codeforces.users`: handles de Codeforces del grupo. Los usa `app.py` y `generate_contest.py`.
-- `codeforces.difficulties`: lista con repeticiones. Cada ocurrencia pide un problema de esa dificultad — no hay un `count` separado porque la cantidad por rating ya está codificada en las repeticiones.
+- `codeforces.users_vjudge`: handles de **vjudge.net** (opcional, lista independiente de `users` — no necesita corresponder 1:1). Cuenta como "resuelto" también lo aceptado a través del mirror de Codeforces de vjudge, que no aparece en la API de Codeforces porque vjudge envía las soluciones con su propia cuenta bot. Mismo mecanismo que ya usaba `atcoder.py` para AtCoder — ver la nota sobre vjudge más abajo.
+- `codeforces.mode`: `"difficulties"` o `"letters"` — cuál de las dos listas de abajo usa esta corrida. Son excluyentes, nunca se combinan.
+- `codeforces.difficulties`: lista con repeticiones, usada cuando `mode` es `"difficulties"`. Cada ocurrencia pide un problema de esa dificultad — no hay un `count` separado porque la cantidad por rating ya está codificada en las repeticiones.
+- `codeforces.letters`: lista con repeticiones (ej. `["C", "C", "D"]`), usada cuando `mode` es `"letters"` — pide un problema no resuelto que haya sido esa letra (o subletra, "C" matchea "C"/"C1"/"C2", sin importar mayúsculas/minúsculas) en algún contest del tipo configurado en `type`.
+- `codeforces.type`: en qué tipo de ronda buscar cuando `mode` es `"letters"`. Es un valor único, no una lista — `"div1"`, `"div3"` y `"div4"` son categorías exclusivas entre sí, pero `"div2"` (el default) ya incluye rounds combinados Div.1+Div.2 y rounds Educational, porque esos también son válidos para entrenar a nivel Div.2.
 - `codeforces.output_links`: ruta del archivo de resultados (default `results.txt` en la raíz si no se especifica).
+
+Nota sobre `type`: Codeforces no tiene un campo estructurado para la división del contest — se saca con regex del nombre (`contest.list`). En rounds "espejados" (mismo número, un contest para Div.1 y otro para Div.2), el mismo problema puede tener letra distinta según la división (confirmado: un problema fue "A" en el Div.1 y "C" en el Div.2 del mismo round) — no hace falta remapear nada a mano porque la API ya da la letra correcta por cada contest por separado, solo hay que clasificar cada `contestId`.
 
 Con la configuración de ejemplo del repo (5 handles, 5 dificultades distintas) genera 5 problemas por tanda. La configuración original usaba 36 handles y 50 problemas:
 
@@ -135,6 +149,7 @@ Configuración en `config.json`:
 ```json
 "gym": {
     "users": ["handle1", "handle2"],
+    "users_vjudge": [],
     "count": 10,
     "require_editorial": false,
     "filters": {
@@ -153,6 +168,7 @@ Configuración en `config.json`:
 ```
 
 - `users`: handles de Codeforces para este flujo — lista separada de `codeforces.users` (los gyms viven en Codeforces, pero puede interesar probarlo con un subconjunto del grupo, o con handles distintos, sin afectar `app.py`).
+- `users_vjudge`: handles de **vjudge.net** (opcional). Un gym cuenta como "tocado" si aparece entre sus submissions mirror de Codeforces, reconocido por el id de contest al principio de cada `probNum` que vjudge devuelve (ej. `"107277A"` → gym `107277`) — no confirmado empíricamente que vjudge mirrore gyms específicamente (sí confirmado para problemas normales de Codeforces), así que si no los mirrorea esto simplemente no encuentra ninguno, sin romper nada.
 - `count`: cuántos gyms recomendar (por defecto 10).
 - `require_editorial`: si es `true`, solo recomienda gyms que efectivamente tengan tutorial/editorial en "Contest materials" — sigue buscando más abajo en la lista (más antiguos) hasta juntar `count` o agotar los candidatos. Si es `false` (default), recomienda los `count` más recientes sin filtrar por esto, y el chequeo de editorial queda solo informativo en el output.
 - `filters.type`: formato del contest, `"ICPC"` o `"IOI"` (o `null` para no filtrar).
@@ -193,6 +209,35 @@ Los 3 botones "Generar" se deshabilitan mientras cualquiera de los 3 está corri
 Esto se apoya en tres cambios de `app.py`/`atcoder.py`/`gym.py`: el progreso se reporta por inyección de dependencias (`on_progress`, con `print` como default para que la consola no cambie nada), si falta configuración obligatoria los 3 módulos levantan `ValueError` en vez de pedir `input()` por consola (un `input()` colgaría la GUI esperando algo que nunca va a llegar), y los loops largos (fetch por usuario, chequeo de editorial por gym) aceptan un `should_stop` opcional que, si da `True`, corta ahí mismo.
 
 Nota: como `gui.py` reescribe `config.json` entero con `json.dump(..., indent=4)` cada vez que guarda, el archivo va a quedar reformateado (arrays multilínea) la primera vez que uses la GUI, aunque el contenido sea el mismo.
+
+## Backend web (`server.py`)
+
+Pieza nueva y separada — ni la consola ni `gui.py` la usan ni dependen de ella, y al revés tampoco (no toca `config.json`, `solved.txt` ni `outputs/`). Llama a la misma lógica core (`app.generate_recommendations`, `atcoder.find_recommended_abc`, `gym.find_untouched_gyms`/`select_recommendations`), pero con parámetros que vienen de un formulario web en vez de `config.json`.
+
+```powershell
+py -m pip install -r requirements-web.txt
+py -m uvicorn server:app --reload
+```
+
+Abre en `http://127.0.0.1:8000`. Variables de entorno (todas opcionales para probar local):
+
+- `APP_PASSWORD`: contraseña compartida para el login. Sin ella, el gate queda abierto — no hace falta inventar una para desarrollar.
+- `SECRET_KEY`: firma la cookie de sesión. Sin ella usa un valor fijo de desarrollo — **hay que setearla en producción**.
+- `MONGODB_URI`: connection string de MongoDB. Sin ella, "usuarios recordados" y "listas guardadas" quedan vacíos pero el resto (correr los 3 flujos, ver progreso en vivo) funciona igual.
+
+### Qué tiene
+
+- Las mismas 3 pestañas que la GUI (Codeforces/AtCoder/Gym), con autocompletado de usuarios ya usados antes (si hay Mongo configurada).
+- Progreso en vivo vía Server-Sent Events — mismo patrón de fondo que `gui.py` (hilo aparte + cola de mensajes), transporte distinto (SSE en vez de `window.write_event_value`).
+- Botón Detener por corrida (misma cancelación cooperativa de `cancel.py` que ya usan consola/GUI).
+- Cada corrida se puede guardar con un título editable; "Listas guardadas" las lista, se pueden renombrar o borrar.
+- Login simple de una sola contraseña compartida (sin cuentas individuales).
+
+### Deploy en Render (gratis)
+
+El repo incluye `render.yaml` para deploy con un clic (Render → New → Blueprint, apuntando a este repo). Variables a completar en el dashboard de Render: `APP_PASSWORD` y `MONGODB_URI` (`SECRET_KEY` se genera sola). El plan free "duerme" tras 15 min sin uso — el primer request después tarda unos segundos en levantar, nada más; como la persistencia vive en MongoDB (no en disco local), no se pierde nada con eso.
+
+Base de datos: [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) tiene un tier gratis para siempre (M0, 512MB) — alcanza de sobra para esta escala.
 
 ## Notas importantes
 

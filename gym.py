@@ -9,6 +9,7 @@ import time
 
 import requests
 
+from app import fetch_user_vjudge_cf_rows
 from cancel import StoppedByUser
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -24,6 +25,15 @@ GYM_ID_MIN = 100000  # gym contest ids all fall above this; regular contests nev
 # always follows it.
 MATERIALS_RE = re.compile(r"Contest materials(.*?)second-level-menu", re.IGNORECASE | re.DOTALL)
 TUTORIAL_RE = re.compile(r"tutorial|editorial", re.IGNORECASE)
+
+# vjudge's own "contestId" field for CodeForces rows is an *internal* vjudge
+# id, not the real Codeforces one — the real one is the leading digits of
+# `probNum` (ej. "107277A" -> 107277), same field app.fetch_user_vjudge_solved
+# reads directly as a key. Not empirically confirmed that vjudge mirrors
+# gym-range problems specifically (unlike the regular-CF case, which was
+# checked live) — if it turns out it doesn't, this just always finds 0
+# touched gyms via vjudge, harmlessly.
+PROBNUM_RE = re.compile(r"^(\d+)([A-Za-z].*)$")
 
 
 def load_config(path="config.json"):
@@ -108,9 +118,21 @@ def fetch_user_touched_gyms(user, *, on_progress):
     return touched
 
 
-def find_untouched_gyms(users, filters, *, on_progress, should_stop=lambda: False):
+def fetch_user_vjudge_touched_gyms(vjudge_user, *, on_progress):
+    rows = fetch_user_vjudge_cf_rows(vjudge_user, on_progress=on_progress)
+    touched = set()
+    for row in rows:
+        m = PROBNUM_RE.match(row.get("probNum", ""))
+        if m and int(m.group(1)) >= GYM_ID_MIN:
+            touched.add(int(m.group(1)))
+    on_progress(f"[{vjudge_user}] {len(touched)} gyms touched ({len(rows)} submissions)")
+    return touched
+
+
+def find_untouched_gyms(users, filters, *, users_vjudge=None, on_progress, should_stop=lambda: False):
     """All gyms matching the metadata filters that no user has touched,
     sorted most recent first. Not yet trimmed to `count`."""
+    users_vjudge = users_vjudge or []
     contests = fetch_gym_contests(on_progress=on_progress)
     candidates = [c for c in contests if matches_filters(c, filters)]
     on_progress(f"{len(candidates)}/{len(contests)} gyms match the configured filters")
@@ -122,6 +144,11 @@ def find_untouched_gyms(users, filters, *, on_progress, should_stop=lambda: Fals
             on_progress("Detenido por el usuario.")
             raise StoppedByUser()
         touched |= fetch_user_touched_gyms(user, on_progress=on_progress)
+    for user in users_vjudge:
+        if should_stop():
+            on_progress("Detenido por el usuario.")
+            raise StoppedByUser()
+        touched |= fetch_user_vjudge_touched_gyms(user, on_progress=on_progress)
     on_progress(f"Gyms touched by the group: {len(touched)}")
 
     untouched = [c for c in candidates if c["id"] not in touched]
@@ -210,22 +237,26 @@ def main(on_progress=print, should_stop=lambda: False):
     cfg = load_config()
     gym_cfg = cfg.get("gym", {})
     users = gym_cfg.get("users", [])
+    users_vjudge = gym_cfg.get("users_vjudge", [])
     filters = gym_cfg.get("filters", {})
     count = gym_cfg.get("count", 10)
     require_editorial = gym_cfg.get("require_editorial", False)
     output_path = gym_cfg.get("output_csv", "outputs/gym_recommendations.csv")
 
-    if not users:
-        raise ValueError("config.json['gym']['users'] is empty")
+    if not users and not users_vjudge:
+        raise ValueError("config.json['gym']['users'/'users_vjudge'] is empty")
 
     on_progress(f"Users ({len(users)}): {', '.join(users)}")
+    on_progress(f"vjudge users ({len(users_vjudge)}): {', '.join(users_vjudge)}")
     on_progress(f"Filters: {filters}")
     if require_editorial:
         on_progress(f"Recommending up to {count} gyms that have a tutorial/editorial.")
     else:
         on_progress(f"Recommending up to {count} gyms.")
 
-    untouched = find_untouched_gyms(users, filters, on_progress=on_progress, should_stop=should_stop)
+    untouched = find_untouched_gyms(
+        users, filters, users_vjudge=users_vjudge, on_progress=on_progress, should_stop=should_stop,
+    )
 
     on_progress(f"=== Checking contest materials ({'required' if require_editorial else 'informational'}) ===")
     recommended, editorials = select_recommendations(

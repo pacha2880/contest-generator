@@ -7,6 +7,7 @@
             "Dilan8787",
             "__profeta"
         ],
+        "users_vjudge": [],
         "difficulties": [
             "1900",
             "1900",
@@ -15,34 +16,34 @@
             "900",
             "800"
         ],
+        "letters": ["c", "C", "D"],
+        "type": "div2",
+        "mode": "letters",
         "output_links": "outputs/codeforces_results.txt"
     },
     "atcoder": {
         "users_atcoder": [
-            "profetaR",
-            "Simurdiera",
-            "dylan_becerra"
+            "DilanJCM8787"
         ],
         "users_vjudge": [
-            "est_chavarria",
-            "Simurdiera_MAC",
-            "dylan_becerra"
+            "DJCM8787", "DilanJCM8787"
         ],
-        "count": 9,
+        "count": 2,
         "lookback": 100,
         "problems": [
-            "f"
+            "a","b","c","d","e"
         ],
         "output_links": "outputs/atcoder_links.txt"
     },
     "gym": {
         "users": [
-            "polyfishy",
-            "alexalvarez123",
-            "Slend"
+            "dilanjuan039",
+            "AMAMEMIE",
+            "ywalcab"
         ],
+        "users_vjudge": [],
         "count": 20,
-        "require_editorial": true,
+        "require_editorial": false,
         "filters": {
             "type": "ICPC",
             "kind": [
