@@ -1,6 +1,6 @@
 """
 server.py
-Backend web de ProblemsHunter (FastAPI). Pieza nueva y separada — no la usan
+Backend web de PachaContests (FastAPI). Pieza nueva y separada — no la usan
 ni la consola (`py main.py ...`) ni `gui.py`, que siguen leyendo config.json
 exactamente igual que antes. Este server llama a las mismas funciones core
 (`app.generate_recommendations`, `atcoder.find_recommended_abc`,
@@ -53,7 +53,7 @@ from cancel import StoppedByUser
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-change-in-production")
 
-app = FastAPI(title="ProblemsHunter")
+app = FastAPI(title="PachaContests")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")

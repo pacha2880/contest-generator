@@ -6,7 +6,7 @@ Este documento resume el estado real del proyecto, las decisiones tomadas y los 
 
 ## Qué hace el proyecto
 
-ProblemsHunter es una herramienta de entrenamiento competitivo para un grupo de programadores bolivianos, con tres flujos iguales en espíritu (API pública → filtrar lo no resuelto por el grupo → mostrar/guardar), cada uno seleccionable desde `main.py`:
+PachaContests es una herramienta de entrenamiento competitivo para un grupo de programadores bolivianos, con tres flujos iguales en espíritu (API pública → filtrar lo no resuelto por el grupo → mostrar/guardar), cada uno seleccionable desde `main.py`:
 
 1. `app.py` (`py main.py codeforces`): usa la API pública de Codeforces para encontrar problemas que ningún miembro del grupo haya resuelto, filtrados por dificultad y ordenados del más reciente al más antiguo.
 2. `atcoder.py` (`py main.py atcoder`): recomienda AtCoder Beginner Contests recientes sin resolver por el grupo (AtCoder nativo + vjudge.net). Ver "Plan de implementación: recomendador AtCoder ABC" más abajo.

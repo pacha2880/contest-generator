@@ -1,6 +1,6 @@
 """
 gui.py
-GUI de escritorio para ProblemsHunter (FreeSimpleGUI).
+GUI de escritorio para PachaContests (FreeSimpleGUI).
 
 Cada pestana (Codeforces/AtCoder/Gym) edita su parte de config.json. Al
 apretar "Generar":
@@ -154,7 +154,7 @@ def main():
         [sg.Button("Detener", key="-STOP-", disabled=True), sg.Button("Limpiar", key="-CLEAR-")],
         [sg.Multiline(size=(90, 15), key="-LOG-", autoscroll=True, disabled=True)],
     ]
-    window = sg.Window("ProblemsHunter", layout, finalize=True)
+    window = sg.Window("PachaContests", layout, finalize=True)
 
     run_buttons = {"-CF-RUN-": ("Codeforces", run_codeforces),
                    "-AC-RUN-": ("AtCoder", run_atcoder),

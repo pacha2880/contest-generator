@@ -141,6 +141,12 @@ header h1 { margin: 0; font-size: 1.2rem; }
 }
 .add-user-btn:hover { background: #15803d; }
 
+.difficulty-range { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.difficulty-range label { flex: 1; min-width: 150px; }
+.star-picker { display: flex; gap: 0.15rem; font-size: 1.4rem; cursor: pointer; width: fit-content; }
+.star-picker .star { color: #d1d5db; }
+.star-picker .star.filled, .star-picker .star.hover { color: #f59e0b; }
+
 .run-controls { display: flex; gap: 0.6rem; }
 .run-btn, .stop-btn {
   padding: 0.6rem 1.2rem;

@@ -85,6 +85,77 @@ function picker(form, field) {
   return form.querySelector(`.user-picker[data-field="${field}"]`)._picker;
 }
 
+// ------------------------------------- Dificultad: estrellas min/max ------
+
+function initDifficultyRange(root) {
+  const minPicker = root.querySelector('.star-picker[data-field="difficulty_min"]');
+  const maxPicker = root.querySelector('.star-picker[data-field="difficulty_max"]');
+  let minValue = 1;
+  let maxValue = 5;
+
+  function paint(picker, value) {
+    picker.querySelectorAll(".star").forEach((s) => {
+      s.classList.toggle("filled", Number(s.dataset.v) <= value);
+    });
+  }
+
+  function wireHover(picker) {
+    const stars = [...picker.querySelectorAll(".star")];
+    stars.forEach((s) => {
+      s.addEventListener("mouseenter", () => {
+        const v = Number(s.dataset.v);
+        stars.forEach((s2) => s2.classList.toggle("hover", Number(s2.dataset.v) <= v));
+      });
+    });
+    picker.addEventListener("mouseleave", () => {
+      stars.forEach((s2) => s2.classList.remove("hover"));
+    });
+  }
+
+  function setMin(v) {
+    minValue = v;
+    if (maxValue < minValue) maxValue = minValue;
+    paint(minPicker, minValue);
+    paint(maxPicker, maxValue);
+  }
+
+  function setMax(v) {
+    maxValue = v;
+    if (minValue > maxValue) minValue = maxValue;
+    paint(minPicker, minValue);
+    paint(maxPicker, maxValue);
+  }
+
+  minPicker.querySelectorAll(".star").forEach((s) => {
+    s.addEventListener("click", () => setMin(Number(s.dataset.v)));
+  });
+  maxPicker.querySelectorAll(".star").forEach((s) => {
+    s.addEventListener("click", () => setMax(Number(s.dataset.v)));
+  });
+  wireHover(minPicker);
+  wireHover(maxPicker);
+  paint(minPicker, minValue);
+  paint(maxPicker, maxValue);
+
+  root._range = {
+    getMin: () => minValue,
+    getMax: () => maxValue,
+    setRange: (min, max) => {
+      minValue = min == null ? 1 : Number(min);
+      maxValue = max == null ? 5 : Number(max);
+      if (minValue > maxValue) maxValue = minValue;
+      paint(minPicker, minValue);
+      paint(maxPicker, maxValue);
+    },
+  };
+}
+
+document.querySelectorAll(".difficulty-range").forEach(initDifficultyRange);
+
+function difficultyRange(form) {
+  return form.querySelector(".difficulty-range")._range;
+}
+
 // --------------------------------------------------- Autocompletado -------
 
 async function loadKnownUsers(platform, datalistId) {
@@ -133,9 +204,11 @@ function buildPayload(flow, form) {
     };
   }
   // gym
-  const filters = {};
-  if (fd.get("difficulty_min")) filters.difficulty_min = Number(fd.get("difficulty_min"));
-  if (fd.get("difficulty_max")) filters.difficulty_max = Number(fd.get("difficulty_max"));
+  const range = difficultyRange(form);
+  const filters = {
+    difficulty_min: range.getMin(),
+    difficulty_max: range.getMax(),
+  };
   return {
     users: picker(form, "users").getValues(),
     users_vjudge: picker(form, "users_vjudge").getValues(),
@@ -169,8 +242,7 @@ function applyParams(form, flow, p) {
     form.querySelector('[name="count"]').value = p.count ?? 10;
     form.querySelector('[name="require_editorial"]').checked = !!p.require_editorial;
     const f = p.filters || {};
-    form.querySelector('[name="difficulty_min"]').value = f.difficulty_min ?? "";
-    form.querySelector('[name="difficulty_max"]').value = f.difficulty_max ?? "";
+    difficultyRange(form).setRange(f.difficulty_min, f.difficulty_max);
   }
 }
 

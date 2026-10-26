@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ProblemsHunter</title>
+  <title>PachaContests</title>
   <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header>
-    <h1>ProblemsHunter</h1>
+    <h1>PachaContests</h1>
     <form method="post" action="/logout"><button type="submit" class="link-btn">Salir</button></form>
   </header>
 
@@ -154,8 +154,26 @@
 
       <label>Cantidad <input type="number" name="count" value="10" min="1"></label>
       <label><input type="checkbox" name="require_editorial"> Requerir tutorial/editorial</label>
-      <label>Dificultad mínima <input type="number" name="difficulty_min" min="1" max="5"></label>
-      <label>Dificultad máxima <input type="number" name="difficulty_max" min="1" max="5"></label>
+      <div class="difficulty-range">
+        <label>Dificultad mínima
+          <div class="star-picker" data-field="difficulty_min">
+            <span class="star" data-v="1">★</span>
+            <span class="star" data-v="2">★</span>
+            <span class="star" data-v="3">★</span>
+            <span class="star" data-v="4">★</span>
+            <span class="star" data-v="5">★</span>
+          </div>
+        </label>
+        <label>Dificultad máxima
+          <div class="star-picker" data-field="difficulty_max">
+            <span class="star" data-v="1">★</span>
+            <span class="star" data-v="2">★</span>
+            <span class="star" data-v="3">★</span>
+            <span class="star" data-v="4">★</span>
+            <span class="star" data-v="5">★</span>
+          </div>
+        </label>
+      </div>
       <label>Título para guardar <input name="title" placeholder="opcional"></label>
 
       <div class="run-controls">

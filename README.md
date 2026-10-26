@@ -1,6 +1,6 @@
-# ProblemsHunter
+# PachaContests
 
-ProblemsHunter genera recomendaciones de entrenamiento competitivo (problemas de Codeforces, contests de AtCoder y gyms de Codeforces) que ningún usuario configurado haya resuelto todavía.
+PachaContests genera recomendaciones de entrenamiento competitivo (problemas de Codeforces, contests de AtCoder y gyms de Codeforces) que ningún usuario configurado haya resuelto todavía.
 
 ## Qué hace
 
