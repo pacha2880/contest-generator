@@ -117,7 +117,9 @@ def _run_codeforces(state, payload):
         )
         db.remember_users("codeforces", users)
         db.remember_users("vjudge", users_vjudge)
-        list_id = db.save_list("codeforces", payload.get("title") or "Sin título", payload, result_lines, items)
+        list_id = None
+        if payload.get("save"):
+            list_id = db.save_list("codeforces", payload.get("title") or "Sin título", payload, result_lines, items)
         _finish(state, "ok", result={"items": items, "list_id": list_id})
     except StoppedByUser:
         _finish(state, "stopped")
@@ -145,7 +147,9 @@ def _run_atcoder(state, payload):
         ]
         db.remember_users("atcoder", users_atcoder)
         db.remember_users("vjudge", users_vjudge)
-        list_id = db.save_list("atcoder", payload.get("title") or "Sin título", payload, [], items)
+        list_id = None
+        if payload.get("save"):
+            list_id = db.save_list("atcoder", payload.get("title") or "Sin título", payload, [], items)
         _finish(state, "ok", result={"items": items, "list_id": list_id})
     except StoppedByUser:
         _finish(state, "stopped")
@@ -183,7 +187,9 @@ def _run_gym(state, payload):
             })
         db.remember_users("codeforces", users)
         db.remember_users("vjudge", users_vjudge)
-        list_id = db.save_list("gym", payload.get("title") or "Sin título", payload, [], items)
+        list_id = None
+        if payload.get("save"):
+            list_id = db.save_list("gym", payload.get("title") or "Sin título", payload, [], items)
         _finish(state, "ok", result={"items": items, "list_id": list_id})
     except StoppedByUser:
         _finish(state, "stopped")

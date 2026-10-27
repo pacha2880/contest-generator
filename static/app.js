@@ -180,8 +180,15 @@ refreshAllKnownUsers();
 
 // --------------------------------------------------- Correr un flujo ------
 
+function saveToggleState(form) {
+  const toggle = form.querySelector(".save-list-toggle");
+  const titleInput = form.querySelector('[name="title"]');
+  return { save: toggle.checked, title: titleInput.value.trim() };
+}
+
 function buildPayload(flow, form) {
   const fd = new FormData(form);
+  const { save, title } = saveToggleState(form);
   if (flow === "codeforces") {
     return {
       users: picker(form, "users").getValues(),
@@ -190,7 +197,8 @@ function buildPayload(flow, form) {
       difficulties: splitCsv(fd.get("difficulties") || ""),
       letters: splitCsv(fd.get("letters") || ""),
       round_type: fd.get("round_type") || "div2",
-      title: fd.get("title") || "",
+      save,
+      title,
     };
   }
   if (flow === "atcoder") {
@@ -200,7 +208,8 @@ function buildPayload(flow, form) {
       count: Number(fd.get("count") || 5),
       lookback: Number(fd.get("lookback") || 50),
       problems: splitCsv(fd.get("problems") || ""),
-      title: fd.get("title") || "",
+      save,
+      title,
     };
   }
   // gym
@@ -215,7 +224,8 @@ function buildPayload(flow, form) {
     count: Number(fd.get("count") || 10),
     require_editorial: fd.get("require_editorial") === "on",
     filters,
-    title: fd.get("title") || "",
+    save,
+    title,
   };
 }
 
@@ -323,6 +333,13 @@ document.querySelectorAll(".run-form").forEach((form) => {
   let currentRunId = null;
   let currentSource = null;
 
+  const saveToggle = form.querySelector(".save-list-toggle");
+  const titleInput = form.querySelector('[name="title"]');
+  saveToggle.addEventListener("change", () => {
+    titleInput.disabled = !saveToggle.checked;
+    if (saveToggle.checked) titleInput.focus();
+  });
+
   refreshConfigSelect(form, flow);
   loadLastConfig(form, flow);
 
@@ -333,7 +350,9 @@ document.querySelectorAll(".run-form").forEach((form) => {
     if (!res.ok) return;
     const cfg = await res.json();
     applyParams(form, flow, cfg.params);
-    form.querySelector('[name="title"]').value = cfg.name;
+    saveToggle.checked = true;
+    titleInput.disabled = false;
+    titleInput.value = cfg.name;
   });
 
   form.querySelector(".delete-config-btn").addEventListener("click", async () => {
@@ -367,6 +386,11 @@ document.querySelectorAll(".run-form").forEach((form) => {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (saveToggle.checked && !titleInput.value.trim()) {
+      alert("Poné un título para guardar la lista.");
+      titleInput.focus();
+      return;
+    }
     log.textContent = "";
     results.innerHTML = "";
     setRunning(true);

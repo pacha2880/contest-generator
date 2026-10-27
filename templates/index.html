@@ -9,7 +9,10 @@
 </head>
 <body>
   <header>
-    <h1>PachaContests</h1>
+    <div class="brand">
+      <img src="/static/favicon.ico" alt="" class="brand-icon">
+      <h1>PachaContests</h1>
+    </div>
     <form method="post" action="/logout"><button type="submit" class="link-btn">Salir</button></form>
   </header>
 
@@ -68,7 +71,8 @@
         </select>
       </label>
 
-      <label>Título para guardar <input name="title" placeholder="opcional"></label>
+      <label><input type="checkbox" class="save-list-toggle"> Guardar esta lista</label>
+      <label>Título para guardar <input name="title" placeholder="obligatorio si guardás" disabled></label>
 
       <div class="run-controls">
         <button type="submit" class="run-btn">Generar</button>
@@ -112,7 +116,8 @@
       <label>Cantidad <input type="number" name="count" value="5" min="1"></label>
       <label>Lookback <input type="number" name="lookback" value="50" min="1"></label>
       <label>Problemas (letras, opcional) <input name="problems" placeholder="C, D"></label>
-      <label>Título para guardar <input name="title" placeholder="opcional"></label>
+      <label><input type="checkbox" class="save-list-toggle"> Guardar esta lista</label>
+      <label>Título para guardar <input name="title" placeholder="obligatorio si guardás" disabled></label>
 
       <div class="run-controls">
         <button type="submit" class="run-btn">Generar</button>
@@ -174,7 +179,8 @@
           </div>
         </label>
       </div>
-      <label>Título para guardar <input name="title" placeholder="opcional"></label>
+      <label><input type="checkbox" class="save-list-toggle"> Guardar esta lista</label>
+      <label>Título para guardar <input name="title" placeholder="obligatorio si guardás" disabled></label>
 
       <div class="run-controls">
         <button type="submit" class="run-btn">Generar</button>
