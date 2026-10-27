@@ -6,6 +6,7 @@ import time
 
 import requests
 
+from app import fetch_vjudge_rows
 from cancel import StoppedByUser
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -13,16 +14,6 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 CONTESTS_URL = "https://kenkoooo.com/atcoder/resources/contests.json"
 CONTEST_PROBLEM_URL = "https://kenkoooo.com/atcoder/resources/contest-problem.json"
 SUBMISSIONS_URL = "https://kenkoooo.com/atcoder/atcoder-api/v3/user/submissions"
-
-# Unofficial, undocumented endpoint that powers vjudge.net's own status page
-# (confirmed 2026-09-14 by inspecting the request the page itself makes).
-# probNum for AtCoder problems already matches kenkoooo's problem_id format
-# (e.g. "abc415_b"), so no translation is needed between the two sources.
-VJUDGE_STATUS_URL = "https://vjudge.net/status/data"
-VJUDGE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "X-Requested-With": "XMLHttpRequest",
-}
 
 ABC_RE = re.compile(r"^abc(\d+)$")
 
@@ -87,37 +78,11 @@ def fetch_user_vjudge_ac(vjudge_user, *, on_progress, page_size=100):
     """Accepted AtCoder problems submitted through vjudge.net's mirror, which
     doesn't show up in kenkoooo's own submissions API. Recognized by probNum
     (== kenkoooo's problem_id) with status "Accepted", filtered server-side
-    to OJId=AtCoder. recordsTotal/recordsFiltered in the response are dummy
-    sentinel values, not real counts, so pagination stops on a short page."""
-    on_progress(f"[{vjudge_user}] (vjudge) fetching submissions...")
-    solved = set()
-    start = 0
-    total = 0
-    while True:
-        try:
-            r = requests.get(
-                VJUDGE_STATUS_URL,
-                params={"draw": 1, "start": start, "length": page_size,
-                        "un": vjudge_user, "OJId": "AtCoder"},
-                headers=VJUDGE_HEADERS,
-                timeout=20,
-            )
-            r.raise_for_status()
-            rows = r.json().get("data", [])
-        except Exception as e:
-            on_progress(f"[{vjudge_user}] request failed: {e}")
-            break
-        if not rows:
-            break
-        for row in rows:
-            total += 1
-            if row.get("status") == "Accepted":
-                solved.add(row["probNum"])
-        if len(rows) < page_size:
-            break
-        start += page_size
-        time.sleep(0.3)
-    on_progress(f"[{vjudge_user}] {len(solved)} accepted ({total} submissions)")
+    to OJId=AtCoder. Pagination/requests-vs-curl fallback lives in
+    app.fetch_vjudge_rows, shared with the Codeforces-side vjudge check."""
+    rows = fetch_vjudge_rows(vjudge_user, "AtCoder", on_progress=on_progress, page_size=page_size)
+    solved = {row["probNum"] for row in rows if row.get("status") == "Accepted"}
+    on_progress(f"[{vjudge_user}] {len(solved)} accepted ({len(rows)} submissions)")
     return solved
 
 

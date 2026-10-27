@@ -469,9 +469,23 @@ Pedido del usuario: que Codeforces y Gym también acepten handles de vjudge para
 
 Probado en vivo: `app.fetch_user_vjudge_solved("pacha2880", ...)` trajo 83 problemas reales; `generate_recommendations([], "difficulties", ..., users_vjudge=["pacha2880"])` funcionó con `users` vacía; `gym.fetch_user_vjudge_touched_gyms("pacha2880", ...)` corrió sin error (0 encontrados, esperable dado el caveat de arriba); `py main.py codeforces` y `py main.py gym` corridos de punta a punta sin cambios de comportamiento visible; una corrida real vía HTTP (`POST /api/run/codeforces` con `users: []`, `users_vjudge: ["pacha2880"]`) funcionó completa con SSE + guardado en Mongo real.
 
+### vjudge 403 en Render: diagnóstico + fallback a curl (2026-10-27)
+
+El usuario deployó en Render y una corrida real de AtCoder mostró `[poly177] (vjudge) request failed: 403 Client Error: Forbidden` contra `vjudge.net/status/data` — no se cayó la corrida entera (el fetch de vjudge ya degradaba con gracia, logueaba el error y seguía), pero el chequeo vía vjudge no funcionó ahí.
+
+Investigado antes de tocar código: `vjudge.net` también está atrás de Cloudflare (`Server: cloudflare`, header `CF-RAY`), igual que `codeforces.com`. Pero a diferencia de Codeforces (donde Cloudflare bloquea específicamente el fingerprint TLS de `requests`, por lo que `gym.has_editorial` ya usa `curl`), **`requests` contra vjudge funciona perfecto desde una IP no bloqueada** (confirmado en vivo) — mismo código, mismos headers, 200 limpio. Eso apunta a que el 403 en Render es por reputación de IP/datacenter (Cloudflare suele marcar rangos de proveedores cloud conocidos), no por el cliente HTTP — un swap a `curl` probablemente no lo arregle, a diferencia del caso de gym.
+
+Como no se puede confirmar sin correr literalmente desde la IP de Render, se implementó diagnóstico + fallback en vez de adivinar:
+
+- **`app._vjudge_fetch_page(method, un, oj_id, start, page_size)`**: pide una página vía `"requests"` o `"curl"`, nunca levanta excepción, devuelve `(status, raw_body)`.
+- **`app.fetch_vjudge_rows(vjudge_user, oj_id, ...)`**: en la primera página, intenta `requests`; si no da 200, loguea status+body (primeros 200 chars) de ese intento, prueba `curl` con los mismos parámetros, loguea su resultado también, y se queda con el que haya dado 200 para el resto de la paginación de ese usuario. Reemplaza la lógica que antes vivía duplicada en `app.py` (filtrada a `OJId=CodeForces`) y `atcoder.py` (filtrada a `OJId=AtCoder`) — ahora ambas pasan por esta única función parametrizada por `oj_id`, y `atcoder.fetch_user_vjudge_ac` quedó como una capa fina sobre ella (`atcoder.py` ahora importa de `app.py`, sin ciclo porque `app.py` no importa `atcoder.py`).
+- `app.fetch_user_vjudge_cf_rows` (usada por `gym.py`) es ahora un wrapper de una línea sobre `fetch_vjudge_rows(..., "CodeForces", ...)`.
+
+Probado en vivo: mismo resultado que antes del refactor para CF (83 aceptados, `pacha2880`) y AtCoder (91 aceptados, `DilanJCM8787`); simulado un 403 forzado monkeypatcheando `_vjudge_fetch_page` para confirmar que el fallback a `curl` se dispara y loguea ambos intentos correctamente; `py main.py atcoder` corrido de punta a punta sin cambios de comportamiento.
+
+**Pendiente real**: falta correr esto en Render mismo para ver los logs de ambos métodos y confirmar la hipótesis (IP vs. headers). Si el fallback a `curl` tampoco funciona ahí, confirma que es bloqueo por IP/ASN y no quedaría más alternativa realista que un proxy residencial (fuera de alcance por ahora) o aceptar la limitación.
+
 ### Pendiente real (no bloqueante)
 
-- **No se probó el deploy real en Render** — `render.yaml` está escrito según la documentación de Render pero no se verificó que el Blueprint levante sin ajustes.
 - Gym en `server.py` solo expone `filters.difficulty_min`/`difficulty_max` en el form (igual que `gui.py`) — el resto de los filtros de gym (`type`, `kind`, `icpc_region`, `duration_*`, `season_*`) no tienen campo en la UI web todavía, aunque si vienen en el payload JSON sí se respetan.
 - No hay un equivalente de `solved.txt` (cache anti-repetición entre corridas) para el flujo de Codeforces en la web — cada corrida web empieza con `past=set()` vacío. Es una simplificación deliberada por ahora, no una decisión final — si hace falta, se podría guardar en Mongo un set de keys ya usadas en listas guardadas.
-- Favicon/branding del sitio: no se tocó, queda el default del navegador.

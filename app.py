@@ -1,10 +1,12 @@
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import requests
 from collections import Counter
+from urllib.parse import urlencode
 
 from cancel import StoppedByUser
 
@@ -13,12 +15,12 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 CF_API = "https://codeforces.com/api"
 PAST_FILE = "solved.txt"
 
-# Unofficial, undocumented endpoint that powers vjudge.net's own status page
-# (same one atcoder.py already uses for its own vjudge mirror check, just
-# filtered to a different OJId here). Confirmed empirically (2026-10-26,
-# querying with OJId=CodeForces) that `probNum` for Codeforces problems is
-# already "{contestId}{index}" (ej. "2203B", "1458A") — exactly this
-# project's own key format, no translation needed.
+# Unofficial, undocumented endpoint that powers vjudge.net's own status page.
+# Shared by atcoder.py (OJId=AtCoder) and gym.py (via fetch_user_vjudge_cf_rows
+# below, OJId=CodeForces). Confirmed empirically (2026-10-26, querying with
+# OJId=CodeForces) that `probNum` for Codeforces problems is already
+# "{contestId}{index}" (ej. "2203B", "1458A") — exactly this project's own
+# key format, no translation needed.
 VJUDGE_STATUS_URL = "https://vjudge.net/status/data"
 VJUDGE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -61,31 +63,75 @@ def get_user_solved(users, *, on_progress, should_stop=lambda: False):
     return solved
 
 
-def fetch_user_vjudge_cf_rows(vjudge_user, *, on_progress, page_size=100):
-    """Raw rows from vjudge's status endpoint, filtered server-side to
-    OJId=CodeForces — submissions made through vjudge's CF mirror, which
-    don't show up in the Codeforces API itself (vjudge submits through its
-    own bot account, not the user's real CF one). recordsTotal/
+def _vjudge_fetch_page(method, un, oj_id, start, page_size):
+    """One page from vjudge's status endpoint via either 'requests' or
+    'curl'. Returns (status_code_or_None, raw_body) — never raises, so the
+    caller can log/compare both methods' results instead of just catching an
+    exception."""
+    params = {"draw": 1, "start": start, "length": page_size, "un": un, "OJId": oj_id}
+    if method == "requests":
+        try:
+            r = requests.get(VJUDGE_STATUS_URL, params=params, headers=VJUDGE_HEADERS, timeout=20)
+            return r.status_code, r.text
+        except Exception as e:
+            return None, f"(excepción: {e})"
+    url = f"{VJUDGE_STATUS_URL}?{urlencode(params)}"
+    try:
+        result = subprocess.run(
+            ["curl", "-s", "-w", "\n%{http_code}",
+             "-A", VJUDGE_HEADERS["User-Agent"],
+             "-H", f"X-Requested-With: {VJUDGE_HEADERS['X-Requested-With']}",
+             url],
+            capture_output=True, encoding="utf-8", errors="replace", timeout=20,
+        )
+        body, _, code = result.stdout.rpartition("\n")
+        return (int(code) if code.strip().isdigit() else None), body
+    except Exception as e:
+        return None, f"(excepción: {e})"
+
+
+def fetch_vjudge_rows(vjudge_user, oj_id, *, on_progress, page_size=100):
+    """Raw rows from vjudge's status endpoint for one OJ (ej. "CodeForces"/
+    "AtCoder" — different callers filter to their own judge). recordsTotal/
     recordsFiltered in the response are dummy sentinel values, not real
-    counts (same as atcoder.py's own vjudge check), so pagination stops on a
-    short page instead. Shared by gym.py, which needs the same rows to
-    detect touched gyms (parsing the contest id out of `probNum` itself)."""
+    counts, so pagination stops on a short page instead.
+
+    On the first page, tries `requests` first and, if that doesn't return
+    200, falls back to `curl` — logging both attempts' status + a body
+    snippet either way. Added 2026-10-27 after a 403 from Render that didn't
+    reproduce locally with `requests` (confirmed against vjudge, which also
+    sits behind Cloudflare like codeforces.com): unlike Codeforces, `requests`
+    worked fine locally here, which points at an IP/datacenter-reputation
+    block rather than the TLS-fingerprint issue `gym.has_editorial already
+    works around with `curl` — this diagnostic is to confirm which one it
+    actually is once it runs on Render. Whichever method gets a 200 on the
+    first page is reused for the rest of that user's pages."""
     on_progress(f"[{vjudge_user}] (vjudge) fetching submissions...")
     rows_out = []
     start = 0
+    method = "requests"
+    first_page = True
     while True:
+        status, body = _vjudge_fetch_page(method, vjudge_user, oj_id, start, page_size)
+
+        if first_page:
+            on_progress(f"[{vjudge_user}] (vjudge, {method}) status={status} body={body[:200]!r}")
+            if status != 200:
+                other = "curl" if method == "requests" else "requests"
+                status2, body2 = _vjudge_fetch_page(other, vjudge_user, oj_id, start, page_size)
+                on_progress(f"[{vjudge_user}] (vjudge, {other}) status={status2} body={body2[:200]!r}")
+                if status2 == 200:
+                    method = other
+                    status, body = status2, body2
+            first_page = False
+
+        if status != 200:
+            on_progress(f"[{vjudge_user}] request failed: HTTP {status}")
+            break
         try:
-            r = requests.get(
-                VJUDGE_STATUS_URL,
-                params={"draw": 1, "start": start, "length": page_size,
-                        "un": vjudge_user, "OJId": "CodeForces"},
-                headers=VJUDGE_HEADERS,
-                timeout=20,
-            )
-            r.raise_for_status()
-            rows = r.json().get("data", [])
+            rows = json.loads(body).get("data", [])
         except Exception as e:
-            on_progress(f"[{vjudge_user}] request failed: {e}")
+            on_progress(f"[{vjudge_user}] respuesta no es JSON válido: {e}")
             break
         if not rows:
             break
@@ -95,6 +141,12 @@ def fetch_user_vjudge_cf_rows(vjudge_user, *, on_progress, page_size=100):
         start += page_size
         time.sleep(0.3)
     return rows_out
+
+
+def fetch_user_vjudge_cf_rows(vjudge_user, *, on_progress, page_size=100):
+    """Shared by gym.py, which needs the same rows to detect touched gyms
+    (parsing the contest id out of `probNum` itself)."""
+    return fetch_vjudge_rows(vjudge_user, "CodeForces", on_progress=on_progress, page_size=page_size)
 
 
 def fetch_user_vjudge_solved(vjudge_user, *, on_progress):
