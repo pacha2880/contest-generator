@@ -114,6 +114,7 @@ def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, *, on_pro
     and some borrow problems from ARC) is reported and skipped for that
     contest; if none of the requested letters exist there, the contest is
     skipped entirely — there's nothing matching the filter to recommend."""
+    problem_letters = [p.lower() for p in (problem_letters or [])]
     contests = fetch_contests(on_progress=on_progress)
     abc_contests = []
     for c in contests:

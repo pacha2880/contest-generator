@@ -55,7 +55,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-change-in-pr
 
 # No automation around this yet (no CHANGELOG.md, no CI check) — bump by hand
 # alongside a meaningful batch of changes to the web UI/backend.
-APP_VERSION = "0.5.1"
+APP_VERSION = "0.5.2"
 
 app = FastAPI(title="PachaContests")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
