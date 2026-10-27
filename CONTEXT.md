@@ -473,7 +473,8 @@ Probado en vivo: `app.fetch_user_vjudge_solved("pacha2880", ...)` trajo 83 probl
 
 Cloudflare bloquea por reputación de IP las requests desde Render a `vjudge.net/status/data` y a `codeforces.com/gym/{id}` (challenge "Just a moment", con cualquier cliente HTTP). Desde un Cloudflare Worker (plan free) ambos responden 200, así que en Render esos dos fetches pasan por el Worker.
 
-- `cloudflare_worker.js`: código del Worker (`proxy.pacha2881.workers.dev`). Exige header `X-Proxy-Key` == secret `PROXY_KEY` y solo reenvía a esos dos destinos (no es un proxy abierto).
+- `cloudflare_worker.js`: código del Worker (`proxy.pacha2881.workers.dev`). Exige header `X-Proxy-Key` == secret `PROXY_KEY` (401 si no coincide) y solo reenvía a esos dos destinos (no es un proxy abierto). Loguea en Observability las respuestas no-200 de upstream.
+- **Placement del Worker fijado en Region → GCP `southamerica-east1`** (Settings → Runtime). Por defecto el Worker corre en el colo más cercano a quien lo llama — desde Render eso es PDX (Portland), y ahí vjudge le devuelve el challenge "Just a moment" (403); desde São Paulo pasa. Smart Placement no alcanzó.
 - `proxy.py`: `is_configured()` (hay `PROXY_URL` y `PROXY_KEY` en el entorno) y `proxy_get(url)`.
 - `app._vjudge_fetch_page` y `gym.has_editorial`: si `proxy.is_configured()` usan el Worker; si no, fetch directo (`requests` para vjudge, `curl` para gym). Sin fallback entre ambos — las env vars solo se setean en Render.
 - `"solution"` es sinónimo de tutorial/editorial en `TUTORIAL_RE` (algunos gyms lo listan así).
