@@ -15,8 +15,8 @@ header {
   color: white;
 }
 header h1 { margin: 0; font-size: 1.2rem; }
-.brand { display: flex; align-items: center; gap: 0.6rem; }
-.brand-icon { width: 24px; height: 24px; }
+.brand { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+.brand-icon { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
 
 .login-body {
   display: flex;
@@ -36,6 +36,7 @@ header h1 { margin: 0; font-size: 1.2rem; }
 }
 .login-box input, .login-box button { padding: 0.6rem; font-size: 1rem; }
 .login-box .brand { justify-content: center; }
+.login-box .brand-icon { width: 96px; height: 96px; }
 .error { color: #b00020; margin: 0; }
 
 .link-btn {
