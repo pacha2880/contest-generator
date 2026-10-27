@@ -134,6 +134,8 @@ Configuración en `config.json`:
 
 Nota sobre vjudge: usa un endpoint interno no documentado (`vjudge.net/status/data`, el mismo que usa la propia página de status) — no hay garantía de que Vjudge no lo cambie sin aviso.
 
+Nota sobre vjudge desde Render: vjudge está detrás de Cloudflare, que bloquea las IPs del datacenter de Render (confirmado — no es arreglable desde código, no es un problema de headers ni de `requests` vs `curl`). Para que esto no deje de funcionar del todo en el deploy web, cada vez que un fetch de vjudge funciona en vivo (lo cual solo pasa corriendo local, nunca desde Render) el resultado queda cacheado en Mongo; si el servidor web lo necesita y el fetch en vivo falla, usa esa cache en vez de no tener nada — se refresca sola cada vez que corrés `py main.py codeforces`/`atcoder`/`gym` o la GUI en tu máquina con Mongo configurado. El dato puede estar desactualizado hasta la última corrida local, lo cual es aceptable para una herramienta de recomendación.
+
 También podés seguir usando `py main.py codeforces` como alias de `py app.py`.
 
 ### 3. Recomendar gyms de Codeforces

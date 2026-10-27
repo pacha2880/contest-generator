@@ -6,8 +6,14 @@ import sys
 import time
 import requests
 from collections import Counter
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+import db
 from cancel import StoppedByUser
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -90,6 +96,15 @@ def _vjudge_fetch_page(method, un, oj_id, start, page_size):
         return None, f"(excepción: {e})"
 
 
+def _format_age(delta):
+    hours = delta.total_seconds() / 3600
+    if hours < 1:
+        return f"{max(1, int(delta.total_seconds() / 60))} min"
+    if hours < 48:
+        return f"{hours:.0f}h"
+    return f"{hours / 24:.0f} días"
+
+
 def fetch_vjudge_rows(vjudge_user, oj_id, *, on_progress, page_size=100):
     """Raw rows from vjudge's status endpoint for one OJ (ej. "CodeForces"/
     "AtCoder" — different callers filter to their own judge). recordsTotal/
@@ -97,20 +112,26 @@ def fetch_vjudge_rows(vjudge_user, oj_id, *, on_progress, page_size=100):
     counts, so pagination stops on a short page instead.
 
     On the first page, tries `requests` first and, if that doesn't return
-    200, falls back to `curl` — logging both attempts' status + a body
-    snippet either way. Added 2026-10-27 after a 403 from Render that didn't
-    reproduce locally with `requests` (confirmed against vjudge, which also
-    sits behind Cloudflare like codeforces.com): unlike Codeforces, `requests`
-    worked fine locally here, which points at an IP/datacenter-reputation
-    block rather than the TLS-fingerprint issue `gym.has_editorial already
-    works around with `curl` — this diagnostic is to confirm which one it
-    actually is once it runs on Render. Whichever method gets a 200 on the
-    first page is reused for the rest of that user's pages."""
+    200, falls back to `curl`, logging both attempts' status + a body
+    snippet either way. Confirmed 2026-10-27 that from Render both get the
+    exact same "Just a moment" Cloudflare challenge — an IP/datacenter
+    reputation block, not a client-fingerprint issue (unlike Codeforces,
+    where `curl` genuinely bypasses it) — so this fallback alone doesn't fix
+    Render, but costs nothing to keep for other possible failure modes.
+
+    What actually makes this usable from Render: every time a live fetch
+    *succeeds* (which only happens from a non-blocked IP — local console/GUI,
+    not Render), the result is cached in Mongo (`db.save_vjudge_cache`). When
+    the live fetch fails, this falls back to that cache instead of returning
+    nothing — so running the app locally every so often keeps Render's data
+    usably fresh, without needing a separate sync job or any paid bypass
+    service. Logs how old the cache is so staleness is visible, not silent."""
     on_progress(f"[{vjudge_user}] (vjudge) fetching submissions...")
     rows_out = []
     start = 0
     method = "requests"
     first_page = True
+    live_ok = True
     while True:
         status, body = _vjudge_fetch_page(method, vjudge_user, oj_id, start, page_size)
 
@@ -126,11 +147,13 @@ def fetch_vjudge_rows(vjudge_user, oj_id, *, on_progress, page_size=100):
             first_page = False
 
         if status != 200:
+            live_ok = False
             on_progress(f"[{vjudge_user}] request failed: HTTP {status}")
             break
         try:
             rows = json.loads(body).get("data", [])
         except Exception as e:
+            live_ok = False
             on_progress(f"[{vjudge_user}] respuesta no es JSON válido: {e}")
             break
         if not rows:
@@ -140,7 +163,20 @@ def fetch_vjudge_rows(vjudge_user, oj_id, *, on_progress, page_size=100):
             break
         start += page_size
         time.sleep(0.3)
-    return rows_out
+
+    if live_ok:
+        db.save_vjudge_cache(vjudge_user, oj_id, rows_out)
+        return rows_out
+
+    cached = db.get_vjudge_cache(vjudge_user, oj_id)
+    if cached is None:
+        on_progress(f"[{vjudge_user}] vjudge no accesible y no hay cache guardada — se omite")
+        return []
+    # pymongo devuelve datetimes "naive" (sin tzinfo) aunque se hayan guardado
+    # con timezone.utc — comparar contra un aware tira TypeError.
+    age = datetime.now(timezone.utc).replace(tzinfo=None) - cached["updated_at"]
+    on_progress(f"[{vjudge_user}] usando cache de vjudge de hace {_format_age(age)} (último fetch en vivo exitoso, probablemente desde local)")
+    return cached["rows"]
 
 
 def fetch_user_vjudge_cf_rows(vjudge_user, *, on_progress, page_size=100):
