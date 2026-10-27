@@ -24,7 +24,7 @@ GYM_ID_MIN = 100000  # gym contest ids all fall above this; regular contests nev
 # section ("second-level-menu", the Problems/Submit/Standings tab bar) that
 # always follows it.
 MATERIALS_RE = re.compile(r"Contest materials(.*?)second-level-menu", re.IGNORECASE | re.DOTALL)
-TUTORIAL_RE = re.compile(r"tutorial|editorial", re.IGNORECASE)
+TUTORIAL_RE = re.compile(r"tutorial|editorial|solution", re.IGNORECASE)
 
 # vjudge's own "contestId" field for CodeForces rows is an *internal* vjudge
 # id, not the real Codeforces one — the real one is the leading digits of
@@ -162,26 +162,37 @@ def stars(difficulty):
     return "★" * difficulty + "☆" * (5 - difficulty)
 
 
-def has_editorial(contest_id, cookie_jar):
+def has_editorial(contest_id, cookie_jar, *, on_progress=None):
     """Scrape the gym page's "Contest materials" sidebar for a tutorial/editorial
     link. Uses curl instead of `requests`: Codeforces's Cloudflare protection
     blocks requests' TLS fingerprint with a fake 200/403 challenge page, but lets
-    curl through. Reusing a cookie jar across calls + a delay keeps it that way."""
+    curl through — at least from a non-datacenter IP (confirmed locally); not
+    confirmed yet from Render's IP, where a 2026-10-27 run came back "unknown"
+    for every single gym, which smells like the same IP-reputation block
+    already diagnosed for vjudge (app.fetch_vjudge_rows) rather than this
+    curl bypass itself failing. `on_progress` (optional — only used to log a
+    reason when the check comes back empty) is how the next Render run can
+    show which of the two it actually is."""
     url = f"https://codeforces.com/gym/{contest_id}"
     try:
         result = subprocess.run(
-            ["curl", "-s", "-c", cookie_jar, "-b", cookie_jar,
+            ["curl", "-s", "-w", "\n%{http_code}", "-c", cookie_jar, "-b", cookie_jar,
              "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", url],
             capture_output=True, encoding="utf-8", errors="replace", timeout=20,
         )
-        html = result.stdout
+        html, _, code = result.stdout.rpartition("\n")
         if not html or "Just a moment" in html:
+            if on_progress:
+                reason = "respuesta vacía" if not html else "challenge 'Just a moment' de Cloudflare"
+                on_progress(f"[gym {contest_id}] editorial: no se pudo chequear ({reason}, HTTP {code or '?'})")
             return None
         materials = MATERIALS_RE.search(html)
         if not materials:
             return False
         return bool(TUTORIAL_RE.search(materials.group(1)))
-    except Exception:
+    except Exception as e:
+        if on_progress:
+            on_progress(f"[gym {contest_id}] editorial: excepción al chequear: {e}")
         return None
 
 
@@ -193,7 +204,7 @@ def check_editorials(recommended, *, on_progress, should_stop=lambda: False):
             if should_stop():
                 on_progress("Detenido por el usuario.")
                 raise StoppedByUser()
-            editorials[contest["id"]] = has_editorial(contest["id"], cookie_jar)
+            editorials[contest["id"]] = has_editorial(contest["id"], cookie_jar, on_progress=on_progress)
             time.sleep(0.9)
     return editorials
 
@@ -222,7 +233,7 @@ def select_recommendations(untouched, count, require_editorial, *, on_progress, 
             if should_stop():
                 on_progress("Detenido por el usuario.")
                 raise StoppedByUser()
-            found = has_editorial(contest["id"], cookie_jar)
+            found = has_editorial(contest["id"], cookie_jar, on_progress=on_progress)
             time.sleep(0.9)
             if found:
                 recommended.append(contest)

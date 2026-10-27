@@ -483,7 +483,13 @@ Como no se puede confirmar sin correr literalmente desde la IP de Render, se imp
 
 Probado en vivo: mismo resultado que antes del refactor para CF (83 aceptados, `pacha2880`) y AtCoder (91 aceptados, `DilanJCM8787`); simulado un 403 forzado monkeypatcheando `_vjudge_fetch_page` para confirmar que el fallback a `curl` se dispara y loguea ambos intentos correctamente; `py main.py atcoder` corrido de punta a punta sin cambios de comportamiento.
 
-**Pendiente real**: falta correr esto en Render mismo para ver los logs de ambos métodos y confirmar la hipótesis (IP vs. headers). Si el fallback a `curl` tampoco funciona ahí, confirma que es bloqueo por IP/ASN y no quedaría más alternativa realista que un proxy residencial (fuera de alcance por ahora) o aceptar la limitación.
+**Confirmado en Render (2026-10-27)**: tanto `requests` como `curl` devuelven el mismo challenge `"Just a moment..."` de Cloudflare con HTTP 403, idéntico en ambos. Esto descarta que sea el fingerprint TLS de `requests` (el `curl` tampoco pasa) y confirma la hipótesis de bloqueo por reputación de IP/datacenter — Cloudflare le sirve el challenge JS duro a la IP de Render sin importar qué cliente mande la request. **No hay arreglo de código realista para esto** (necesitaría un proxy residencial, fuera de alcance por ahora) — queda como limitación conocida y documentada: desde Render, los handles de vjudge no aportan nada al chequeo de resueltos (ni para Codeforces ni para AtCoder), solo funciona local. El fallback a `curl` se deja igual en el código porque no estorba y sí sirve para otros posibles bloqueos no basados en IP.
+
+El mismo día se vio además que el chequeo de editorial de gym (`gym.has_editorial`, que también scrapea `codeforces.com` con `curl`) devolvía `"unknown"` para absolutamente todos los gyms en una corrida real en Render — coherente con la misma causa (reputación de IP de Render bloqueada por Cloudflare), aunque ahí se trata de `codeforces.com` y no de `vjudge.net`. Se le agregó el mismo tipo de diagnóstico (`on_progress` opcional en `has_editorial`, logea el motivo — respuesta vacía, challenge, o HTTP code — cuando el chequeo falla) para confirmarlo con certeza la próxima corrida, en vez de asumir que es exactamente la misma causa sin verificarlo. De paso se agregó `"solution"` como sinónimo más en `TUTORIAL_RE` (pedido del usuario — algunos gyms listan el link como "Solution" en vez de "Tutorial"/"Editorial").
+
+### Versión visible en la web (2026-10-27)
+
+`server.py` define `APP_VERSION = "0.4.0"` (hardcodeada, sin changelog ni automatización todavía — pedido explícito del usuario de "vos decidí el número") y la inyecta como global de Jinja2 (`templates.env.globals["app_version"]`), así que cualquier template la usa sin pasarla por cada `TemplateResponse`. Se muestra discreta, `position: fixed` en la esquina inferior derecha (`.version-tag` en `style.css`), en `index.html` y `login.html`.
 
 ### Pendiente real (no bloqueante)
 

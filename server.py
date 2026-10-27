@@ -53,10 +53,15 @@ from cancel import StoppedByUser
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-change-in-production")
 
+# No automation around this yet (no CHANGELOG.md, no CI check) — bump by hand
+# alongside a meaningful batch of changes to the web UI/backend.
+APP_VERSION = "0.4.0"
+
 app = FastAPI(title="PachaContests")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["app_version"] = APP_VERSION
 
 
 # ---------------------------------------------------------------------------
