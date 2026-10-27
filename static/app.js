@@ -19,12 +19,21 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 
 // ---------------------------------------------------- Modo CF: rating/letra
 
-const cfModeSelect = document.querySelector('.run-form[data-flow="codeforces"] .mode-select');
-if (cfModeSelect) {
-  cfModeSelect.addEventListener("change", () => {
-    const mode = cfModeSelect.value;
+// Switch: apagado = por rating, prendido = por letra. Los campos del otro
+// modo quedan visibles pero deshabilitados (y FormData los ignora).
+const cfModeToggle = document.querySelector('.run-form[data-flow="codeforces"] .mode-toggle');
+
+function cfMode() {
+  return cfModeToggle.checked ? "letters" : "difficulties";
+}
+
+if (cfModeToggle) {
+  cfModeToggle.addEventListener("change", () => {
+    const mode = cfMode();
     document.querySelectorAll(".mode-field").forEach((el) => {
-      el.hidden = !el.classList.contains(`mode-${mode}`);
+      const active = el.classList.contains(`mode-${mode}`);
+      el.classList.toggle("inactive", !active);
+      el.querySelectorAll("input, select").forEach((f) => { f.disabled = !active; });
     });
   });
 }
@@ -190,13 +199,15 @@ function buildPayload(flow, form) {
   const fd = new FormData(form);
   const { save, title } = saveToggleState(form);
   if (flow === "codeforces") {
+    const mode = cfMode();
+    const byMode = mode === "letters"
+      ? { letters: splitCsv(fd.get("letters") || ""), round_type: fd.get("round_type") || "div2" }
+      : { difficulties: splitCsv(fd.get("difficulties") || "") };
     return {
       users: picker(form, "users").getValues(),
       users_vjudge: picker(form, "users_vjudge").getValues(),
-      mode: fd.get("mode"),
-      difficulties: splitCsv(fd.get("difficulties") || ""),
-      letters: splitCsv(fd.get("letters") || ""),
-      round_type: fd.get("round_type") || "div2",
+      mode,
+      ...byMode,
       save,
       title,
     };
@@ -234,9 +245,8 @@ function applyParams(form, flow, p) {
   if (flow === "codeforces") {
     picker(form, "users").setValues(p.users);
     picker(form, "users_vjudge").setValues(p.users_vjudge);
-    const modeSelect = form.querySelector('[name="mode"]');
-    modeSelect.value = p.mode || "difficulties";
-    modeSelect.dispatchEvent(new Event("change"));
+    cfModeToggle.checked = p.mode === "letters";
+    cfModeToggle.dispatchEvent(new Event("change"));
     form.querySelector('[name="difficulties"]').value = (p.difficulties || []).join(", ");
     form.querySelector('[name="letters"]').value = (p.letters || []).join(", ");
     form.querySelector('[name="round_type"]').value = p.round_type || "div2";

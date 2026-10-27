@@ -52,18 +52,17 @@
         </div>
       </div>
 
-      <label>Modo
-        <select name="mode" class="mode-select">
-          <option value="difficulties">Por rating</option>
-          <option value="letters">Por letra</option>
-        </select>
-      </label>
+      <div class="mode-switch">
+        <span>Por rating</span>
+        <label class="switch"><input type="checkbox" class="mode-toggle"><span class="slider"></span></label>
+        <span>Por letra</span>
+      </div>
 
       <label class="mode-field mode-difficulties">Dificultades <input name="difficulties" placeholder="1900, 1900, 1700, 1300, 900, 800"></label>
 
-      <label class="mode-field mode-letters" hidden>Letras <input name="letters" placeholder="C, C, D"></label>
-      <label class="mode-field mode-letters" hidden>Tipo de ronda
-        <select name="round_type">
+      <label class="mode-field mode-letters inactive">Letras <input name="letters" placeholder="C, C, D" disabled></label>
+      <label class="mode-field mode-letters inactive">Tipo de ronda
+        <select name="round_type" disabled>
           <option value="div2">Div.2 (incluye Div.1+2 y Educational)</option>
           <option value="div1">Div.1</option>
           <option value="div3">Div.3</option>

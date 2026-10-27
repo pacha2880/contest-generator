@@ -91,6 +91,20 @@ header h1 { margin: 0; font-size: 1.2rem; }
 }
 .run-form label:has(input[type=checkbox]) { flex-direction: row; align-items: center; gap: 0.5rem; }
 
+.mode-switch { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; color: #374151; }
+.switch { position: relative; width: 42px; height: 24px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider {
+  position: absolute; inset: 0; cursor: pointer;
+  background: #2563eb; border-radius: 999px; transition: background .2s;
+}
+.switch .slider::before {
+  content: ""; position: absolute; left: 3px; top: 3px;
+  width: 18px; height: 18px; background: white; border-radius: 50%; transition: transform .2s;
+}
+.switch input:checked + .slider::before { transform: translateX(18px); }
+.mode-field.inactive { opacity: 0.45; }
+
 .config-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
 .config-bar select {
   flex: 1;
