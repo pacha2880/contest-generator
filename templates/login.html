@@ -9,7 +9,10 @@
 </head>
 <body class="login-body">
   <form class="login-box" method="post" action="/login">
-    <h1>PachaContests</h1>
+    <div class="brand">
+      <img src="/static/favicon.ico" alt="" class="brand-icon">
+      <h1>PachaContests</h1>
+    </div>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <input type="password" name="password" placeholder="Contraseña" autofocus required>
     <button type="submit">Entrar</button>
