@@ -78,7 +78,7 @@ def fetch_user_vjudge_ac(vjudge_user, *, on_progress, page_size=100):
     """Accepted AtCoder problems submitted through vjudge.net's mirror, which
     doesn't show up in kenkoooo's own submissions API. Recognized by probNum
     (== kenkoooo's problem_id) with status "Accepted", filtered server-side
-    to OJId=AtCoder. Pagination/requests-vs-curl fallback lives in
+    to OJId=AtCoder. Pagination (and the Worker proxy) lives in
     app.fetch_vjudge_rows, shared with the Codeforces-side vjudge check."""
     rows = fetch_vjudge_rows(vjudge_user, "AtCoder", on_progress=on_progress, page_size=page_size)
     solved = {row["probNum"] for row in rows if row.get("status") == "Accepted"}

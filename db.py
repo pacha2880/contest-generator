@@ -1,9 +1,8 @@
 """
 db.py
-Capa de persistencia para el backend web (server.py). `app.py` también la
-importa (desde 2026-10-27) para la cache de vjudge (ver vjudge_cache más
-abajo) — el resto de la consola/gui.py sigue con config.json/solved.txt tal
-cual, sin tocar Mongo para nada más.
+Capa de persistencia para el backend web (server.py).
+La consola/gui.py siguen con config.json/solved.txt tal cual, sin tocar
+Mongo.
 
 Colecciones en MongoDB:
 - known_users: handles vistos en corridas anteriores, para autocompletar.
@@ -13,11 +12,6 @@ Colecciones en MongoDB:
   flujo), para precargar el formulario la próxima vez que se abre la página.
 - saved_configs: configuraciones con nombre, guardadas a mano, para volver
   a cargarlas sin tipear todo de nuevo.
-- vjudge_cache: último resultado exitoso de `app.fetch_vjudge_rows` por
-  (handle, oj_id) — vjudge.net está bloqueado desde Render (ver CONTEXT.md,
-  2026-10-27) pero funciona perfecto en local, así que esto deja que una
-  corrida en Render use el último dato que sí se consiguió corriendo local,
-  en vez de no tener nada.
 
 Si no hay MONGODB_URI configurada (ej. corriendo local sin Mongo todavía),
 todas las funciones degradan a no-ops / listas vacías en vez de romper el
@@ -255,23 +249,3 @@ def delete_named_config(config_id):
         return False
     result = db.saved_configs.delete_one({"_id": ObjectId(config_id)})
     return result.deleted_count > 0
-
-
-# --- vjudge_cache: último fetch en vivo exitoso de vjudge, por (handle, oj) -
-
-def save_vjudge_cache(handle, oj_id, rows):
-    db = _get_db()
-    if db is None:
-        return
-    db.vjudge_cache.update_one(
-        {"handle": handle, "oj_id": oj_id},
-        {"$set": {"rows": rows, "updated_at": datetime.now(timezone.utc)}},
-        upsert=True,
-    )
-
-
-def get_vjudge_cache(handle, oj_id):
-    db = _get_db()
-    if db is None:
-        return None
-    return db.vjudge_cache.find_one({"handle": handle, "oj_id": oj_id}, {"_id": 0, "rows": 1, "updated_at": 1})

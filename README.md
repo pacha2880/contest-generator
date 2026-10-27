@@ -134,7 +134,7 @@ Configuración en `config.json`:
 
 Nota sobre vjudge: usa un endpoint interno no documentado (`vjudge.net/status/data`, el mismo que usa la propia página de status) — no hay garantía de que Vjudge no lo cambie sin aviso.
 
-Nota sobre vjudge desde Render: vjudge está detrás de Cloudflare, que bloquea las IPs del datacenter de Render (confirmado — no es arreglable desde código, no es un problema de headers ni de `requests` vs `curl`). Para que esto no deje de funcionar del todo en el deploy web, cada vez que un fetch de vjudge funciona en vivo (lo cual solo pasa corriendo local, nunca desde Render) el resultado queda cacheado en Mongo; si el servidor web lo necesita y el fetch en vivo falla, usa esa cache en vez de no tener nada — se refresca sola cada vez que corrés `py main.py codeforces`/`atcoder`/`gym` o la GUI en tu máquina con Mongo configurado. El dato puede estar desactualizado hasta la última corrida local, lo cual es aceptable para una herramienta de recomendación.
+Nota sobre vjudge y gym desde Render: Cloudflare bloquea las IPs de Render, así que ahí esos fetches pasan por un Cloudflare Worker (`cloudflare_worker.js`, ver `PROXY_URL`/`PROXY_KEY` más abajo). Local no hace falta.
 
 También podés seguir usando `py main.py codeforces` como alias de `py app.py`.
 
@@ -226,6 +226,7 @@ Abre en `http://127.0.0.1:8000`. Variables de entorno (todas opcionales para pro
 - `APP_PASSWORD`: contraseña compartida para el login. Sin ella, el gate queda abierto — no hace falta inventar una para desarrollar.
 - `SECRET_KEY`: firma la cookie de sesión. Sin ella usa un valor fijo de desarrollo — **hay que setearla en producción**.
 - `MONGODB_URI`: connection string de MongoDB. Sin ella, "usuarios recordados" y "listas guardadas" quedan vacíos pero el resto (correr los 3 flujos, ver progreso en vivo) funciona igual.
+- `PROXY_URL` / `PROXY_KEY`: URL del Cloudflare Worker y su clave (secret `PROXY_KEY` del Worker). Solo en Render; local se dejan sin setear y vjudge/gym se piden directo.
 
 ### Qué tiene
 
@@ -237,7 +238,7 @@ Abre en `http://127.0.0.1:8000`. Variables de entorno (todas opcionales para pro
 
 ### Deploy en Render (gratis)
 
-El repo incluye `render.yaml` para deploy con un clic (Render → New → Blueprint, apuntando a este repo). Variables a completar en el dashboard de Render: `APP_PASSWORD` y `MONGODB_URI` (`SECRET_KEY` se genera sola). El plan free "duerme" tras 15 min sin uso — el primer request después tarda unos segundos en levantar, nada más; como la persistencia vive en MongoDB (no en disco local), no se pierde nada con eso.
+El repo incluye `render.yaml` para deploy con un clic (Render → New → Blueprint, apuntando a este repo). Variables a completar en el dashboard de Render: `APP_PASSWORD`, `MONGODB_URI`, `PROXY_URL` y `PROXY_KEY` (`SECRET_KEY` se genera sola). El plan free "duerme" tras 15 min sin uso — el primer request después tarda unos segundos en levantar, nada más; como la persistencia vive en MongoDB (no en disco local), no se pierde nada con eso.
 
 Base de datos: [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) tiene un tier gratis para siempre (M0, 512MB) — alcanza de sobra para esta escala.
 

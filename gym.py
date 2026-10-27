@@ -9,6 +9,7 @@ import time
 
 import requests
 
+import proxy
 from app import fetch_user_vjudge_cf_rows
 from cancel import StoppedByUser
 
@@ -162,18 +163,10 @@ def stars(difficulty):
     return "★" * difficulty + "☆" * (5 - difficulty)
 
 
-def has_editorial(contest_id, cookie_jar, *, on_progress=None):
-    """Scrape the gym page's "Contest materials" sidebar for a tutorial/editorial
-    link. Uses curl instead of `requests`: Codeforces's Cloudflare protection
-    blocks requests' TLS fingerprint with a fake 200/403 challenge page, but lets
-    curl through — at least from a non-datacenter IP (confirmed locally); not
-    confirmed yet from Render's IP, where a 2026-10-27 run came back "unknown"
-    for every single gym, which smells like the same IP-reputation block
-    already diagnosed for vjudge (app.fetch_vjudge_rows) rather than this
-    curl bypass itself failing. `on_progress` (optional — only used to log a
-    reason when the check comes back empty) is how the next Render run can
-    show which of the two it actually is."""
-    url = f"https://codeforces.com/gym/{contest_id}"
+def _curl_get(url, cookie_jar):
+    """(status_code_or_None, body) via curl — never raises. curl instead of
+    `requests` because Codeforces's Cloudflare blocks requests' TLS
+    fingerprint on gym pages but lets curl through."""
     try:
         result = subprocess.run(
             ["curl", "-s", "-w", "\n%{http_code}", "-c", cookie_jar, "-b", cookie_jar,
@@ -181,19 +174,28 @@ def has_editorial(contest_id, cookie_jar, *, on_progress=None):
             capture_output=True, encoding="utf-8", errors="replace", timeout=20,
         )
         html, _, code = result.stdout.rpartition("\n")
-        if not html or "Just a moment" in html:
-            if on_progress:
-                reason = "respuesta vacía" if not html else "challenge 'Just a moment' de Cloudflare"
-                on_progress(f"[gym {contest_id}] editorial: no se pudo chequear ({reason}, HTTP {code or '?'})")
-            return None
-        materials = MATERIALS_RE.search(html)
-        if not materials:
-            return False
-        return bool(TUTORIAL_RE.search(materials.group(1)))
+        return (int(code) if code.strip().isdigit() else None), html
     except Exception as e:
+        return None, f"(excepción: {e})"
+
+
+def has_editorial(contest_id, cookie_jar, *, on_progress=None):
+    """Scrape the gym page's "Contest materials" sidebar for a tutorial/editorial
+    link. Fetched through the Cloudflare Worker when proxy.py is configured
+    (Render), with curl otherwise (local). Returns None (not False) when the
+    page couldn't be fetched, so "no editorial" is never reported without
+    actually checking."""
+    url = f"https://codeforces.com/gym/{contest_id}"
+    if proxy.is_configured():
+        status, html = proxy.proxy_get(url)
+    else:
+        status, html = _curl_get(url, cookie_jar)
+    if status != 200 or "Just a moment" in html:
         if on_progress:
-            on_progress(f"[gym {contest_id}] editorial: excepción al chequear: {e}")
+            on_progress(f"[gym {contest_id}] editorial: no se pudo chequear (HTTP {status})")
         return None
+    materials = MATERIALS_RE.search(html)
+    return bool(materials and TUTORIAL_RE.search(materials.group(1)))
 
 
 def check_editorials(recommended, *, on_progress, should_stop=lambda: False):
