@@ -266,46 +266,23 @@ function applyParams(form, flow, p) {
   }
 }
 
-function renderResults(container, flow, items, listId) {
-  const data = (items || []).slice();
-
-  function draw() {
-    if (data.length === 0) {
-      container.innerHTML = "<p>Sin resultados.</p>";
-      return;
-    }
-    const canDelete = !!listId;
-    const extraHead = canDelete ? "<th></th>" : "";
-    const delCell = (i) =>
-      canDelete ? `<td><button type="button" class="danger small-btn resolved-btn" data-i="${i}">Resuelto</button></td>` : "";
-
-    let rows;
-    if (flow === "codeforces") {
-      rows = data.map((p, i) => `<tr><td>${p.label}</td><td>${p.name}</td><td><a href="${p.url}" target="_blank">${p.url}</a></td>${delCell(i)}</tr>`).join("");
-      container.innerHTML = `<table><thead><tr><th>Dificultad/Letra</th><th>Nombre</th><th>Link</th>${extraHead}</tr></thead><tbody>${rows}</tbody></table>`;
-    } else if (flow === "atcoder") {
-      rows = data.map((c, i) => `<tr><td>${c.id}</td><td>${c.title}</td><td><a href="${c.link}" target="_blank">${c.link}</a></td>${delCell(i)}</tr>`).join("");
-      container.innerHTML = `<table><thead><tr><th>Id</th><th>Título</th><th>Link</th>${extraHead}</tr></thead><tbody>${rows}</tbody></table>`;
-    } else {
-      rows = data.map((g, i) => `<tr><td>${g.id}</td><td>${g.name}</td><td>${g.difficulty}</td><td>${g.editorial}</td><td><a href="${g.link}" target="_blank">${g.link}</a></td>${delCell(i)}</tr>`).join("");
-      container.innerHTML = `<table><thead><tr><th>Id</th><th>Nombre</th><th>Dificultad</th><th>Editorial</th><th>Link</th>${extraHead}</tr></thead><tbody>${rows}</tbody></table>`;
-    }
-
-    if (canDelete) {
-      container.querySelectorAll(".resolved-btn").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          const i = Number(btn.dataset.i);
-          const res = await fetch(`/api/lists/${listId}/items/${i}`, { method: "DELETE" });
-          if (res.ok) {
-            data.splice(i, 1);
-            draw();
-          }
-        });
-      });
-    }
+function renderResults(container, flow, items) {
+  const data = items || [];
+  if (data.length === 0) {
+    container.innerHTML = "<p>Sin resultados.</p>";
+    return;
   }
-
-  draw();
+  let rows;
+  if (flow === "codeforces") {
+    rows = data.map((p) => `<tr><td>${p.label}</td><td>${p.name}</td><td><a href="${p.url}" target="_blank">${p.url}</a></td></tr>`).join("");
+    container.innerHTML = `<table><thead><tr><th>Dificultad/Letra</th><th>Nombre</th><th>Link</th></tr></thead><tbody>${rows}</tbody></table>`;
+  } else if (flow === "atcoder") {
+    rows = data.map((c) => `<tr><td>${c.id}</td><td>${c.title}</td><td><a href="${c.link}" target="_blank">${c.link}</a></td></tr>`).join("");
+    container.innerHTML = `<table><thead><tr><th>Id</th><th>Título</th><th>Link</th></tr></thead><tbody>${rows}</tbody></table>`;
+  } else {
+    rows = data.map((g) => `<tr><td>${g.id}</td><td>${g.name}</td><td>${g.difficulty}</td><td>${g.editorial}</td><td><a href="${g.link}" target="_blank">${g.link}</a></td></tr>`).join("");
+    container.innerHTML = `<table><thead><tr><th>Id</th><th>Nombre</th><th>Dificultad</th><th>Editorial</th><th>Link</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
 }
 
 // --------------------------------------------- Configuraciones guardadas --
@@ -432,7 +409,7 @@ document.querySelectorAll(".run-form").forEach((form) => {
       const payload = JSON.parse(ev.data);
       if (payload.status === "ok") {
         appendLog("=== Listo ===");
-        renderResults(results, flow, payload.result && payload.result.items, payload.result && payload.result.list_id);
+        renderResults(results, flow, payload.result && payload.result.items);
         refreshAllKnownUsers();
       } else if (payload.status === "stopped") {
         appendLog("=== Detenido por el usuario — no se generó ningún archivo ===");
@@ -481,9 +458,10 @@ async function loadSavedLists() {
       <div class="saved-item-head">
         <input type="text" value="${item.title}" data-id="${item._id}">
         <button class="view-btn">Ver</button>
+        <button class="primary refresh-btn">Actualizar</button>
         <button class="danger delete-btn">Borrar</button>
       </div>
-      <p class="saved-meta">${item.flow} · ${new Date(item.created_at).toLocaleString()}</p>
+      <p class="saved-meta">${item.flow} · ${new Date(item.created_at).toLocaleString()} <span class="refresh-status"></span></p>
       <div class="saved-item-body" hidden></div>
     `;
     const titleInput = div.querySelector("input");
@@ -500,13 +478,33 @@ async function loadSavedLists() {
       div.remove();
     });
     const body = div.querySelector(".saved-item-body");
+    const refreshBtn = div.querySelector(".refresh-btn");
+    const refreshStatus = div.querySelector(".refresh-status");
+    // Vuelve a chequear la lista contra sus propios usuarios y saca lo ya tocado.
+    refreshBtn.addEventListener("click", async () => {
+      refreshBtn.disabled = true;
+      refreshStatus.textContent = "· actualizando...";
+      try {
+        const res = await fetch(`/api/lists/${item._id}/refresh`, { method: "POST" });
+        if (!res.ok) throw new Error(res.status);
+        const { removed, items } = await res.json();
+        refreshStatus.textContent = removed
+          ? `· ${removed} ya tocado${removed === 1 ? "" : "s"}, quitado${removed === 1 ? "" : "s"}`
+          : "· nada nuevo tocado";
+        if (!body.hidden) renderResults(body, item.flow, items);
+      } catch (e) {
+        refreshStatus.textContent = "· no se pudo actualizar";
+      } finally {
+        refreshBtn.disabled = false;
+      }
+    });
     div.querySelector(".view-btn").addEventListener("click", async () => {
       if (!body.hidden) {
         body.hidden = true;
         return;
       }
       const full = await (await fetch(`/api/lists/${item._id}`)).json();
-      renderResults(body, full.flow, full.items, full._id);
+      renderResults(body, full.flow, full.items);
       body.hidden = false;
     });
     container.appendChild(div);

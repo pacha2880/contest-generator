@@ -130,6 +130,22 @@ def fetch_user_vjudge_touched_gyms(vjudge_user, *, on_progress):
     return touched
 
 
+def fetch_group_touched_gyms(users, users_vjudge, *, on_progress, should_stop=lambda: False):
+    """Union of gyms touched by `users` (Codeforces) and `users_vjudge`."""
+    touched = set()
+    for user in users:
+        if should_stop():
+            on_progress("Detenido por el usuario.")
+            raise StoppedByUser()
+        touched |= fetch_user_touched_gyms(user, on_progress=on_progress)
+    for user in users_vjudge or []:
+        if should_stop():
+            on_progress("Detenido por el usuario.")
+            raise StoppedByUser()
+        touched |= fetch_user_vjudge_touched_gyms(user, on_progress=on_progress)
+    return touched
+
+
 def find_untouched_gyms(users, filters, *, users_vjudge=None, on_progress, should_stop=lambda: False):
     """All gyms matching the metadata filters that no user has touched,
     sorted most recent first. Not yet trimmed to `count`."""
@@ -139,17 +155,7 @@ def find_untouched_gyms(users, filters, *, users_vjudge=None, on_progress, shoul
     on_progress(f"{len(candidates)}/{len(contests)} gyms match the configured filters")
 
     on_progress("=== Fetching user submissions ===")
-    touched = set()
-    for user in users:
-        if should_stop():
-            on_progress("Detenido por el usuario.")
-            raise StoppedByUser()
-        touched |= fetch_user_touched_gyms(user, on_progress=on_progress)
-    for user in users_vjudge:
-        if should_stop():
-            on_progress("Detenido por el usuario.")
-            raise StoppedByUser()
-        touched |= fetch_user_vjudge_touched_gyms(user, on_progress=on_progress)
+    touched = fetch_group_touched_gyms(users, users_vjudge, on_progress=on_progress, should_stop=should_stop)
     on_progress(f"Gyms touched by the group: {len(touched)}")
 
     untouched = [c for c in candidates if c["id"] not in touched]

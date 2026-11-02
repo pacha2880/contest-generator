@@ -157,27 +157,6 @@ def delete_saved_list(list_id):
     return result.deleted_count > 0
 
 
-def remove_item_from_list(list_id, index):
-    """Saca el item en esa posición (ej. "ya lo resolví") y reacomoda el
-    resto. False si la lista o el índice no existen."""
-    from bson import ObjectId
-    db = _get_db()
-    if db is None:
-        return False
-    doc = db.saved_lists.find_one({"_id": ObjectId(list_id)}, {"items": 1})
-    if doc is None:
-        return False
-    items = doc.get("items") or []
-    if index < 0 or index >= len(items):
-        return False
-    items.pop(index)
-    db.saved_lists.update_one(
-        {"_id": ObjectId(list_id)},
-        {"$set": {"items": items, "updated_at": datetime.now(timezone.utc)}},
-    )
-    return True
-
-
 # --- last_configs: parámetros de la última corrida de cada flujo ----------
 
 def remember_last_config(flow, params):

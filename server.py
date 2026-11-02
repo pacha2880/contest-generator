@@ -55,7 +55,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-change-in-pr
 
 # No automation around this yet (no CHANGELOG.md, no CI check) — bump by hand
 # alongside a meaningful batch of changes to the web UI/backend.
-APP_VERSION = "0.6.0"
+APP_VERSION = "0.7.0"
 
 app = FastAPI(title="PachaContests")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -323,14 +323,39 @@ def api_delete_saved(list_id: str, _=Depends(auth.require_login_api)):
     return {"ok": True}
 
 
-@app.delete("/api/lists/{list_id}/items/{index}")
-def api_delete_saved_item(list_id: str, index: int, _=Depends(auth.require_login_api)):
-    """Saca un contest/problema puntual de una lista guardada (ej. "ya lo
-    resolví"), sin borrar la lista entera."""
-    ok = db.remove_item_from_list(list_id, index)
-    if not ok:
+def _untouched_items(flow, params, items):
+    """Los items de una lista guardada que los usuarios de esa misma lista
+    (los de `params`, guardados al generarla) todavía no tocaron. Si un fetch
+    falla, ese usuario simplemente no aporta nada: un error nunca saca items."""
+    quiet = lambda msg: None
+    users_vjudge = params.get("users_vjudge", [])
+    if flow == "codeforces":
+        solved = cf_app.get_group_solved(params.get("users", []), users_vjudge, on_progress=quiet)
+        return [it for it in items if it.get("key") not in solved]
+    if flow == "atcoder":
+        solved = atcoder.fetch_group_solved(params.get("users_atcoder", []), users_vjudge, on_progress=quiet)
+        problem_map = atcoder.fetch_contest_problems(on_progress=quiet)
+        letters = [p.lower() for p in params.get("problems") or []]
+        return [
+            it for it in items
+            if not any(p in solved for p in atcoder.target_problems(it["id"], problem_map, letters, on_progress=quiet))
+        ]
+    touched = gym.fetch_group_touched_gyms(params.get("users", []), users_vjudge, on_progress=quiet)
+    return [it for it in items if it["id"] not in touched]
+
+
+@app.post("/api/lists/{list_id}/refresh")
+def api_refresh_saved(list_id: str, _=Depends(auth.require_login_api)):
+    """Vuelve a chequear cada item contra los usuarios de la lista y saca los
+    que ya fueron tocados. Sync def: corre en el threadpool (tarda segundos)."""
+    doc = db.get_saved_list(list_id)
+    if doc is None:
         raise HTTPException(404, "No encontrada")
-    return {"ok": True}
+    items = doc.get("items") or []
+    remaining = _untouched_items(doc["flow"], doc.get("params") or {}, items)
+    if len(remaining) != len(items):
+        db.update_saved_list(list_id, items=remaining)
+    return {"removed": len(items) - len(remaining), "items": remaining}
 
 
 # ---------------------------------------------------------------------------

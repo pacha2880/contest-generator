@@ -105,6 +105,22 @@ def fetch_group_solved(users_atcoder, users_vjudge, *, on_progress, should_stop=
     return solved
 
 
+def target_problems(contest_id, problem_map, problem_letters, *, on_progress):
+    """Problem ids of `contest_id` that count for the "already solved" check:
+    all of them, or only the requested letters (lowercase) that exist there."""
+    problems = problem_map.get(contest_id, [])
+    if not problem_letters:
+        return problems
+    target = []
+    for letter in problem_letters:
+        pid = f"{contest_id}_{letter}"
+        if pid in problems:
+            target.append(pid)
+        elif problems:
+            on_progress(f"Nota: {contest_id} no tiene problema '{letter.upper()}', se omite para este contest")
+    return target
+
+
 def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, *, on_progress, problem_letters=None, should_stop=lambda: False):
     """problem_letters: e.g. ["c", "d", "e"] narrows the check from "any
     problem in the contest" to just those letters — a contest is recommended
@@ -135,22 +151,9 @@ def find_recommended_abc(users_atcoder, users_vjudge, count, lookback, *, on_pro
         if should_stop():
             on_progress("Detenido por el usuario.")
             raise StoppedByUser()
-        problems = problem_map.get(c["id"], [])
-        if not problems:
+        target = target_problems(c["id"], problem_map, problem_letters, on_progress=on_progress)
+        if not target:
             continue
-
-        if problem_letters:
-            target = []
-            for letter in problem_letters:
-                pid = f"{c['id']}_{letter}"
-                if pid in problems:
-                    target.append(pid)
-                else:
-                    on_progress(f"Nota: {c['id']} no tiene problema '{letter.upper()}', se omite para este contest")
-            if not target:
-                continue
-        else:
-            target = problems
 
         if any(p in solved for p in target):
             continue
