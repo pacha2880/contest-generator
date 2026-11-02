@@ -214,6 +214,23 @@ header h1 { margin: 0; font-size: 1.2rem; }
 .saved-item button.primary { border-color: #2563eb; background: #2563eb; color: white; }
 .saved-item button.primary:disabled { background: #93c5fd; border-color: #93c5fd; cursor: not-allowed; }
 
+/* Ítems ya tocados por el grupo (marcados al Actualizar una lista). */
+tr.touched td { background: #dcfce7; }
+
+.share-btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.3rem 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; background: #f9fafb; color: #374151; cursor: pointer; }
+.share-btn:hover { background: #eef2ff; }
+.share-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.85rem; color: #6b7280; }
+
+/* Vista pública de una lista (share.html). */
+.share-page { max-width: 860px; margin: 0 auto; padding: 1.5rem; }
+.share-page h2 { margin: 0 0 0.75rem; }
+.list-desc { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1rem; background: white; padding: 1rem; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.06); font-size: 0.9rem; margin: 0 0 1rem; }
+.list-desc dt { color: #6b7280; }
+.list-desc dd { margin: 0; }
+.share-actions { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: #6b7280; }
+.share-actions button { font-size: 0.9rem; padding: 0.4rem 0.9rem; border-radius: 4px; border: 1px solid #2563eb; background: #2563eb; color: white; cursor: pointer; }
+.share-actions button:disabled { background: #93c5fd; border-color: #93c5fd; cursor: not-allowed; }
+
 .version-tag {
   position: fixed;
   bottom: 6px;

@@ -266,25 +266,6 @@ function applyParams(form, flow, p) {
   }
 }
 
-function renderResults(container, flow, items) {
-  const data = items || [];
-  if (data.length === 0) {
-    container.innerHTML = "<p>Sin resultados.</p>";
-    return;
-  }
-  let rows;
-  if (flow === "codeforces") {
-    rows = data.map((p) => `<tr><td>${p.label}</td><td>${p.name}</td><td><a href="${p.url}" target="_blank">${p.url}</a></td></tr>`).join("");
-    container.innerHTML = `<table><thead><tr><th>Dificultad/Letra</th><th>Nombre</th><th>Link</th></tr></thead><tbody>${rows}</tbody></table>`;
-  } else if (flow === "atcoder") {
-    rows = data.map((c) => `<tr><td>${c.id}</td><td>${c.title}</td><td><a href="${c.link}" target="_blank">${c.link}</a></td></tr>`).join("");
-    container.innerHTML = `<table><thead><tr><th>Id</th><th>Título</th><th>Link</th></tr></thead><tbody>${rows}</tbody></table>`;
-  } else {
-    rows = data.map((g) => `<tr><td>${g.id}</td><td>${g.name}</td><td>${g.difficulty}</td><td>${g.editorial}</td><td><a href="${g.link}" target="_blank">${g.link}</a></td></tr>`).join("");
-    container.innerHTML = `<table><thead><tr><th>Id</th><th>Nombre</th><th>Dificultad</th><th>Editorial</th><th>Link</th></tr></thead><tbody>${rows}</tbody></table>`;
-  }
-}
-
 // --------------------------------------------- Configuraciones guardadas --
 
 async function refreshConfigSelect(form, flow) {
@@ -410,6 +391,15 @@ document.querySelectorAll(".run-form").forEach((form) => {
       if (payload.status === "ok") {
         appendLog("=== Listo ===");
         renderResults(results, flow, payload.result && payload.result.items);
+        const listId = payload.result && payload.result.list_id;
+        if (listId) {
+          const status = document.createElement("span");
+          status.className = "share-status";
+          const bar = document.createElement("div");
+          bar.className = "share-bar";
+          bar.append("Lista guardada ", shareButton(listId, (msg) => { status.textContent = msg; }), status);
+          results.prepend(bar);
+        }
         refreshAllKnownUsers();
       } else if (payload.status === "stopped") {
         appendLog("=== Detenido por el usuario — no se generó ningún archivo ===");
@@ -456,12 +446,12 @@ async function loadSavedLists() {
     div.className = "saved-item";
     div.innerHTML = `
       <div class="saved-item-head">
-        <input type="text" value="${item.title}" data-id="${item._id}">
+        <input type="text" value="${esc(item.title)}">
         <button class="view-btn">Ver</button>
         <button class="primary refresh-btn">Actualizar</button>
         <button class="danger delete-btn">Borrar</button>
       </div>
-      <p class="saved-meta">${item.flow} · ${new Date(item.created_at).toLocaleString()} <span class="refresh-status"></span></p>
+      <p class="saved-meta">${esc(item.flow)} · ${esc(fmtDate(item.created_at))} <span class="refresh-status"></span></p>
       <div class="saved-item-body" hidden></div>
     `;
     const titleInput = div.querySelector("input");
@@ -480,18 +470,17 @@ async function loadSavedLists() {
     const body = div.querySelector(".saved-item-body");
     const refreshBtn = div.querySelector(".refresh-btn");
     const refreshStatus = div.querySelector(".refresh-status");
-    // Vuelve a chequear la lista contra sus propios usuarios y saca lo ya tocado.
+    refreshBtn.after(shareButton(item._id, (msg) => { refreshStatus.textContent = `· ${msg}`; }));
+    // Vuelve a chequear la lista contra sus propios usuarios y pinta de verde lo ya tocado.
     refreshBtn.addEventListener("click", async () => {
       refreshBtn.disabled = true;
       refreshStatus.textContent = "· actualizando...";
       try {
         const res = await fetch(`/api/lists/${item._id}/refresh`, { method: "POST" });
         if (!res.ok) throw new Error(res.status);
-        const { removed, items } = await res.json();
-        refreshStatus.textContent = removed
-          ? `· ${removed} ya tocado${removed === 1 ? "" : "s"}, quitado${removed === 1 ? "" : "s"}`
-          : "· nada nuevo tocado";
-        if (!body.hidden) renderResults(body, item.flow, items);
+        const list = await res.json();
+        refreshStatus.textContent = `· ${refreshMessage(list.newly_touched)}`;
+        if (!body.hidden) renderResults(body, list.flow, list.items);
       } catch (e) {
         refreshStatus.textContent = "· no se pudo actualizar";
       } finally {

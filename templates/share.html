@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PachaContests</title>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="/static/favicon.ico" alt="" class="brand-icon">
+      <h1>PachaContests</h1>
+    </div>
+  </header>
+
+  <main class="share-page" data-token="{{ token }}">
+    <h2 id="share-title">Cargando...</h2>
+    <div id="share-desc"></div>
+    <div class="share-actions" hidden>
+      <button type="button" id="share-refresh">Actualizar</button>
+      <span id="share-status"></span>
+    </div>
+    <div class="results" id="share-results"></div>
+  </main>
+
+  <div class="version-tag">v{{ app_version }}</div>
+  <script src="/static/render.js"></script>
+  <script src="/static/share.js"></script>
+</body>
+</html>

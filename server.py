@@ -55,7 +55,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-change-in-pr
 
 # No automation around this yet (no CHANGELOG.md, no CI check) — bump by hand
 # alongside a meaningful batch of changes to the web UI/backend.
-APP_VERSION = "0.7.0"
+APP_VERSION = "0.8.0"
 
 app = FastAPI(title="PachaContests")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -323,39 +323,94 @@ def api_delete_saved(list_id: str, _=Depends(auth.require_login_api)):
     return {"ok": True}
 
 
-def _untouched_items(flow, params, items):
-    """Los items de una lista guardada que los usuarios de esa misma lista
-    (los de `params`, guardados al generarla) todavía no tocaron. Si un fetch
-    falla, ese usuario simplemente no aporta nada: un error nunca saca items."""
+def _touched_flags(flow, params, items):
+    """Para cada item de una lista guardada, si alguno de los usuarios de esa
+    misma lista (los de `params`, guardados al generarla) ya lo tocó. Si un
+    fetch falla, ese usuario no aporta nada: un error nunca marca items."""
     quiet = lambda msg: None
     users_vjudge = params.get("users_vjudge", [])
     if flow == "codeforces":
         solved = cf_app.get_group_solved(params.get("users", []), users_vjudge, on_progress=quiet)
-        return [it for it in items if it.get("key") not in solved]
+        return [it.get("key") in solved for it in items]
     if flow == "atcoder":
         solved = atcoder.fetch_group_solved(params.get("users_atcoder", []), users_vjudge, on_progress=quiet)
         problem_map = atcoder.fetch_contest_problems(on_progress=quiet)
         letters = [p.lower() for p in params.get("problems") or []]
         return [
-            it for it in items
-            if not any(p in solved for p in atcoder.target_problems(it["id"], problem_map, letters, on_progress=quiet))
+            any(p in solved for p in atcoder.target_problems(it["id"], problem_map, letters, on_progress=quiet))
+            for it in items
         ]
     touched = gym.fetch_group_touched_gyms(params.get("users", []), users_vjudge, on_progress=quiet)
-    return [it for it in items if it["id"] not in touched]
+    return [it["id"] in touched for it in items]
+
+
+def _public_view(doc):
+    """Lo que ve cualquiera con el link público (sin _id ni token)."""
+    params = {k: v for k, v in (doc.get("params") or {}).items() if k not in ("save", "title")}
+    return {
+        "flow": doc["flow"],
+        "title": doc.get("title"),
+        "params": params,
+        "items": doc.get("items") or [],
+        "created_at": doc.get("created_at"),
+        "updated_at": doc.get("updated_at"),
+    }
+
+
+def _refresh_list(doc):
+    """Vuelve a chequear la lista y marca `touched: True` (verde) en lo que ya
+    fue tocado. La marca nunca se saca. Tarda segundos: las rutas que lo usan
+    son sync def, así corren en el threadpool."""
+    items = doc.get("items") or []
+    flags = _touched_flags(doc["flow"], doc.get("params") or {}, items)
+    newly = 0
+    for it, touched in zip(items, flags):
+        if touched and not it.get("touched"):
+            it["touched"] = True
+            newly += 1
+    db.update_saved_list(doc["_id"], items=items)
+    return {"newly_touched": newly, **_public_view(db.get_saved_list(doc["_id"]))}
 
 
 @app.post("/api/lists/{list_id}/refresh")
 def api_refresh_saved(list_id: str, _=Depends(auth.require_login_api)):
-    """Vuelve a chequear cada item contra los usuarios de la lista y saca los
-    que ya fueron tocados. Sync def: corre en el threadpool (tarda segundos)."""
     doc = db.get_saved_list(list_id)
     if doc is None:
         raise HTTPException(404, "No encontrada")
-    items = doc.get("items") or []
-    remaining = _untouched_items(doc["flow"], doc.get("params") or {}, items)
-    if len(remaining) != len(items):
-        db.update_saved_list(list_id, items=remaining)
-    return {"removed": len(items) - len(remaining), "items": remaining}
+    return _refresh_list(doc)
+
+
+@app.get("/api/lists/{list_id}/share")
+def api_share_saved(list_id: str, _=Depends(auth.require_login_api)):
+    token = db.get_share_token(list_id)
+    if token is None:
+        raise HTTPException(404, "No encontrada")
+    return {"token": token}
+
+
+# ---------------------------------------------------------------------------
+# Vista pública de una lista (sin login): /s/{token}
+# ---------------------------------------------------------------------------
+
+@app.get("/s/{token}", response_class=HTMLResponse)
+def share_page(request: Request, token: str):
+    return templates.TemplateResponse(request, "share.html", {"token": token})
+
+
+@app.get("/api/public/{token}")
+def api_public_list(token: str):
+    doc = db.get_list_by_share_token(token)
+    if doc is None:
+        raise HTTPException(404, "No encontrada")
+    return _public_view(doc)
+
+
+@app.post("/api/public/{token}/refresh")
+def api_public_refresh(token: str):
+    doc = db.get_list_by_share_token(token)
+    if doc is None:
+        raise HTTPException(404, "No encontrada")
+    return _refresh_list(doc)
 
 
 # ---------------------------------------------------------------------------

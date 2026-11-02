@@ -19,6 +19,7 @@ resto del server — así se puede probar generación+SSE+login sin Mongo.
 """
 
 import os
+import secrets
 from datetime import datetime, timezone
 
 try:
@@ -101,6 +102,7 @@ def save_list(flow, title, params, result_lines, items):
         "params": params,
         "result_lines": result_lines,
         "items": items,
+        "share_token": secrets.token_urlsafe(12),
         "created_at": now,
         "updated_at": now,
     }
@@ -129,6 +131,34 @@ def get_saved_list(list_id):
     if db is None:
         return None
     doc = db.saved_lists.find_one({"_id": ObjectId(list_id)})
+    if doc:
+        doc["_id"] = str(doc["_id"])
+    return doc
+
+
+def get_share_token(list_id):
+    """Token del link público de la lista (fijo, nunca se regenera). Las
+    listas guardadas antes de que existiera esto lo reciben acá, la primera
+    vez que alguien lo pide. None si la lista no existe."""
+    from bson import ObjectId
+    db = _get_db()
+    if db is None:
+        return None
+    doc = db.saved_lists.find_one({"_id": ObjectId(list_id)}, {"share_token": 1})
+    if doc is None:
+        return None
+    if not doc.get("share_token"):
+        token = secrets.token_urlsafe(12)
+        db.saved_lists.update_one({"_id": doc["_id"], "share_token": None}, {"$set": {"share_token": token}})
+        doc = db.saved_lists.find_one({"_id": doc["_id"]}, {"share_token": 1})
+    return doc["share_token"]
+
+
+def get_list_by_share_token(token):
+    db = _get_db()
+    if db is None:
+        return None
+    doc = db.saved_lists.find_one({"share_token": token})
     if doc:
         doc["_id"] = str(doc["_id"])
     return doc
