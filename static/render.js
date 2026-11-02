@@ -81,6 +81,28 @@ function refreshMessage(newlyTouched) {
 const SHARE_ICON =
   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
 
+// Copia al portapapeles. La Clipboard API puede estar bloqueada (permiso
+// denegado, webviews embebidos, http sin TLS); ahí cae a execCommand("copy")
+// con un textarea temporal, que no pide permiso. false si ninguno funcionó.
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e2) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+
 // Botón "copiar link público" de una lista guardada. `onStatus(texto)` avisa
 // el resultado (copiado / error).
 function shareButton(listId, onStatus) {
@@ -99,13 +121,7 @@ function shareButton(listId, onStatus) {
       onStatus("no se pudo obtener el link");
       return;
     }
-    try {
-      await navigator.clipboard.writeText(url);
-      onStatus("link copiado");
-    } catch (e) {
-      // Sin permiso de portapapeles: se muestra para copiarlo a mano.
-      onStatus(`copiá el link: ${url}`);
-    }
+    onStatus(await copyText(url) ? "link copiado" : `copiá el link: ${url}`);
   });
   return btn;
 }
