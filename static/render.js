@@ -58,8 +58,8 @@ function describeList(list) {
       ? ["Búsqueda", `Por letra: ${join(p.letters)} · ronda ${esc(ROUND_LABELS[p.round_type] || p.round_type)}`]
       : ["Búsqueda", `Por rating: ${join(p.difficulties)}`]);
   } else if (list.flow === "atcoder") {
-    const problems = (p.problems || []).length ? `solo problemas ${join(p.problems)}` : "contest completo";
-    rows.push(["Búsqueda", `${esc(p.count)} ABC sin tocar, entre los últimos ${esc(p.lookback)} · ${problems}`]);
+    const letters = (p.problems || []).map((l) => String(l).toUpperCase());
+    rows.push(["Búsqueda", letters.length ? join(letters) : "contest completo"]);
   } else {
     const f = p.filters || {};
     const editorial = p.require_editorial ? " · solo con editorial" : "";
