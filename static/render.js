@@ -22,15 +22,23 @@ function renderResults(container, flow, items) {
     return;
   }
   const link = (url) => `<a href="${esc(url)}" target="_blank">${esc(url)}</a>`;
-  const tr = (item, cells) =>
-    `<tr${item.touched ? ' class="touched" title="Ya tocado"' : ""}>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
+  // Verde: completo. Amarillo (solo AtCoder): a medias, con lo que falta.
+  const missingText = (item) => (item.missing || []).length ? `faltan ${item.missing.join(", ")}` : "";
+  const tr = (item, cells) => {
+    const attrs = item.touched ? ' class="touched" title="Completo"'
+      : missingText(item) ? ` class="partial" title="${esc(missingText(item))}"` : "";
+    return `<tr${attrs}>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
+  };
   let head, rows;
   if (flow === "codeforces") {
     head = ["Dificultad/Letra", "Nombre", "Link"];
     rows = data.map((p) => tr(p, [esc(p.label), esc(p.name), link(p.url)]));
   } else if (flow === "atcoder") {
     head = ["Id", "Título", "Link"];
-    rows = data.map((c) => tr(c, [esc(c.id), esc(c.title), link(c.link)]));
+    rows = data.map((c) => {
+      const note = missingText(c) ? ` <span class="missing-note">(${esc(missingText(c))})</span>` : "";
+      return tr(c, [esc(c.id), esc(c.title) + note, link(c.link)]);
+    });
   } else {
     head = ["Id", "Nombre", "Dificultad", "Editorial", "Link"];
     rows = data.map((g) => tr(g, [esc(g.id), esc(g.name), esc(g.difficulty), esc(g.editorial), link(g.link)]));
@@ -69,13 +77,14 @@ function describeList(list) {
   rows.push(["Creada", esc(fmtDate(list.created_at))]);
   rows.push(["Última actualización", esc(fmtDate(list.updated_at))]);
   const items = list.items || [];
-  rows.push(["Progreso", `${items.filter((it) => it.touched).length} de ${items.length} tocados`]);
+  const partial = items.filter((it) => !it.touched && (it.missing || []).length).length;
+  rows.push(["Progreso", `${items.filter((it) => it.touched).length} de ${items.length} completos${partial ? ` · ${partial} a medias` : ""}`]);
   return `<dl class="list-desc">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
 }
 
 function refreshMessage(newlyTouched) {
-  if (!newlyTouched) return "nada nuevo tocado";
-  return newlyTouched === 1 ? "1 nuevo tocado (en verde)" : `${newlyTouched} nuevos tocados (en verde)`;
+  if (!newlyTouched) return "nada nuevo completo";
+  return newlyTouched === 1 ? "1 nuevo completo (en verde)" : `${newlyTouched} nuevos completos (en verde)`;
 }
 
 const SHARE_ICON =

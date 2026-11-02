@@ -55,7 +55,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-change-in-pr
 
 # No automation around this yet (no CHANGELOG.md, no CI check) — bump by hand
 # alongside a meaningful batch of changes to the web UI/backend.
-APP_VERSION = "0.8.2"
+APP_VERSION = "0.9.0"
 
 app = FastAPI(title="PachaContests")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -323,25 +323,29 @@ def api_delete_saved(list_id: str, _=Depends(auth.require_login_api)):
     return {"ok": True}
 
 
-def _touched_flags(flow, params, items):
-    """Para cada item de una lista guardada, si alguno de los usuarios de esa
-    misma lista (los de `params`, guardados al generarla) ya lo tocó. Si un
-    fetch falla, ese usuario no aporta nada: un error nunca marca items."""
+def _missing_problems(flow, params, items):
+    """Para cada item de una lista guardada, qué le falta al grupo (la unión
+    de los usuarios de `params`, guardados al generarla): [] = completo
+    (verde), None = sin tocar, y solo en AtCoder una lista de letras = a
+    medias (amarillo; ej. pedía C, D, E y solo hicieron C → ["D", "E"]). Si
+    un fetch falla, ese usuario no aporta nada: un error nunca marca items."""
     quiet = lambda msg: None
     users_vjudge = params.get("users_vjudge", [])
     if flow == "codeforces":
         solved = cf_app.get_group_solved(params.get("users", []), users_vjudge, on_progress=quiet)
-        return [it.get("key") in solved for it in items]
+        return [[] if it.get("key") in solved else None for it in items]
     if flow == "atcoder":
         solved = atcoder.fetch_group_solved(params.get("users_atcoder", []), users_vjudge, on_progress=quiet)
         problem_map = atcoder.fetch_contest_problems(on_progress=quiet)
         letters = [p.lower() for p in params.get("problems") or []]
-        return [
-            any(p in solved for p in atcoder.target_problems(it["id"], problem_map, letters, on_progress=quiet))
-            for it in items
-        ]
+        out = []
+        for it in items:
+            target = atcoder.target_problems(it["id"], problem_map, letters, on_progress=quiet)
+            missing = [pid.rsplit("_", 1)[-1].upper() for pid in target if pid not in solved]
+            out.append(None if not target or len(missing) == len(target) else missing)
+        return out
     touched = gym.fetch_group_touched_gyms(params.get("users", []), users_vjudge, on_progress=quiet)
-    return [it["id"] in touched for it in items]
+    return [[] if it["id"] in touched else None for it in items]
 
 
 def _public_view(doc):
@@ -358,15 +362,25 @@ def _public_view(doc):
 
 
 def _refresh_list(doc):
-    """Vuelve a chequear la lista y marca `touched: True` (verde) en lo que ya
-    fue tocado. La marca nunca se saca. Tarda segundos: las rutas que lo usan
+    """Vuelve a chequear la lista: `touched: True` (verde) en lo completo y
+    `missing: [...]` (amarillo) en lo que quedó a medias. Las marcas nunca
+    retroceden (verde no vuelve a amarillo, y `missing` solo se achica), así
+    un fetch fallido no deshace nada. Tarda segundos: las rutas que lo usan
     son sync def, así corren en el threadpool."""
     items = doc.get("items") or []
-    flags = _touched_flags(doc["flow"], doc.get("params") or {}, items)
+    statuses = _missing_problems(doc["flow"], doc.get("params") or {}, items)
     newly = 0
-    for it, touched in zip(items, flags):
-        if touched and not it.get("touched"):
+    for it, missing in zip(items, statuses):
+        if it.get("touched") or missing is None:
+            continue
+        old = it.get("missing")
+        if old and missing:
+            missing = [m for m in missing if m in old]
+        if missing:
+            it["missing"] = missing
+        else:
             it["touched"] = True
+            it.pop("missing", None)
             newly += 1
     db.update_saved_list(doc["_id"], items=items)
     return {"newly_touched": newly, **_public_view(db.get_saved_list(doc["_id"]))}

@@ -216,6 +216,8 @@ header h1 { margin: 0; font-size: 1.2rem; }
 
 /* Ítems ya tocados por el grupo (marcados al Actualizar una lista). */
 tr.touched td { background: #dcfce7; }
+tr.partial td { background: #fef9c3; }
+.missing-note { color: #a16207; font-size: 0.85em; }
 
 .share-btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.3rem 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; background: #f9fafb; color: #374151; cursor: pointer; }
 .share-btn:hover { background: #eef2ff; }
