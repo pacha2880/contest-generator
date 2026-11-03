@@ -7,12 +7,17 @@ function splitCsv(value) {
 
 // ---------------------------------------------------------------- Tabs ----
 
+// La última pestaña abierta se recuerda en este navegador; sin una guardada
+// arranca en la Guía (la activa por defecto en el HTML).
+const LAST_TAB_KEY = "lastTab";
+
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById(`panel-${btn.dataset.tab}`).classList.add("active");
+    try { localStorage.setItem(LAST_TAB_KEY, btn.dataset.tab); } catch (e) {}
     if (btn.dataset.tab === "saved") loadSavedLists();
   });
 });
@@ -501,3 +506,10 @@ async function loadSavedLists() {
 }
 
 document.getElementById("saved-flow-filter").addEventListener("change", loadSavedLists);
+
+// Restaurar la última pestaña (al final, cuando ya está todo cableado).
+try {
+  const lastTab = localStorage.getItem(LAST_TAB_KEY);
+  const lastBtn = lastTab && document.querySelector(`.tab-btn[data-tab="${lastTab}"]`);
+  if (lastBtn) lastBtn.click();
+} catch (e) {}

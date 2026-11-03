@@ -243,3 +243,16 @@ tr.partial td { background: #fef9c3; }
   pointer-events: none;
   z-index: 10;
 }
+
+/* Guía: secciones desplegables con ▸ (cerrada) / ▾ (abierta). */
+.guide { line-height: 1.5; color: #1f2937; }
+.guide h2 { margin-top: 0; }
+.guide h3 { margin: 1.25rem 0 0.4rem; font-size: 1rem; }
+.guide ol, .guide ul { margin: 0.3rem 0; padding-left: 1.4rem; }
+.guide code { background: #f3f4f6; padding: 0 0.25rem; border-radius: 3px; font-size: 0.9em; }
+.guide details { background: white; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-top: 0.6rem; padding: 0.6rem 0.9rem; }
+.guide summary { cursor: pointer; font-weight: 600; list-style: none; }
+.guide summary::-webkit-details-marker { display: none; }
+.guide summary::before { content: "▸"; display: inline-block; width: 1.1rem; color: #2563eb; }
+.guide details[open] summary::before { content: "▾"; }
+.guide details ul { margin-top: 0.5rem; }

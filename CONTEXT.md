@@ -488,3 +488,7 @@ Cloudflare bloquea por reputación de IP las requests desde Render a `vjudge.net
 
 - Gym en `server.py` solo expone `filters.difficulty_min`/`difficulty_max` en el form (igual que `gui.py`) — el resto de los filtros de gym (`type`, `kind`, `icpc_region`, `duration_*`, `season_*`) no tienen campo en la UI web todavía, aunque si vienen en el payload JSON sí se respetan.
 - No hay un equivalente de `solved.txt` (cache anti-repetición entre corridas) para el flujo de Codeforces en la web — cada corrida web empieza con `past=set()` vacío. Es una simplificación deliberada por ahora, no una decisión final — si hace falta, se podría guardar en Mongo un set de keys ya usadas en listas guardadas.
+
+### Pestaña Guía (2026-11-03)
+
+Primera pestaña de `index.html` (`#panel-guide`): guía corta en "usted" (texto aprobado por el usuario), con una sección desplegable `<details>` por juez + vjudge + listas guardadas (▸ cerrada / ▾ abierta, vía `summary::before`). `app.js` guarda la última pestaña en `localStorage["lastTab"]` y la restaura al cargar; sin una guardada arranca en la Guía, que es la activa por defecto en el HTML.

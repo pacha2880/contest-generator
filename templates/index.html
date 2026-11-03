@@ -17,14 +17,75 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab-btn active" data-tab="codeforces">Codeforces</button>
+    <button class="tab-btn active" data-tab="guide">Guía</button>
+    <button class="tab-btn" data-tab="codeforces">Codeforces</button>
     <button class="tab-btn" data-tab="atcoder">AtCoder</button>
     <button class="tab-btn" data-tab="gym">Gym</button>
     <button class="tab-btn" data-tab="saved">Listas guardadas</button>
   </nav>
 
+  <!-- ===================== Guía ===================== -->
+  <section class="tab-panel active guide" id="panel-guide">
+    <h2>Guía rápida</h2>
+    <p><strong>PachaContests le recomienda problemas y contests que nadie de su grupo tocó todavía</strong>, en Codeforces, AtCoder y gyms de Codeforces. También cuenta lo que resolvieron en vjudge.</p>
+
+    <h3>Cómo se usa</h3>
+    <ol>
+      <li>Elija la pestaña del juez y cargue los handles. Los de vjudge van aparte y no hace falta que coincidan con los otros.</li>
+      <li>Ajuste la búsqueda deseada y toque en <strong>Generar</strong>.</li>
+      <li>Marque <strong>"Guardar esta lista"</strong> para tenerla después en <em>Listas guardadas</em>.</li>
+    </ol>
+
+    <h3>Para qué sirve</h3>
+    <ul>
+      <li><strong>Entrenamiento personal:</strong> problemas de Codeforces por rating o por letra, y ABC de AtCoder por letras, sin repetir nada que ya hizo.</li>
+      <li><strong>Equipo ICPC:</strong> gyms que ningún miembro tocó, si quiere solo los que tienen editorial, para simulacros.</li>
+      <li><strong>Coach o grupo:</strong> una lista para todo el grupo. Compártala con 🔗 y siga el progreso con <strong>Actualizar</strong>.</li>
+    </ul>
+
+    <details>
+      <summary>Codeforces</summary>
+      <ul>
+        <li><strong>Por rating:</strong> un número por problema. <code>1900, 1700, 800</code> da 3 problemas.</li>
+        <li><strong>Por letra:</strong> una letra por problema (<code>C, C, D</code>) más el tipo de ronda (Div.1, 2, 3 o 4).</li>
+        <li>Un problema cuenta como resuelto si alguien tiene AC en Codeforces o en vjudge.</li>
+      </ul>
+    </details>
+    <details>
+      <summary>AtCoder</summary>
+      <ul>
+        <li>Recomienda ABC sin tocar. <strong>Cantidad</strong> es cuántos ABC quiere y <strong>Lookback</strong> es entre cuántos de los últimos ABC buscar.</li>
+        <li><strong>Problemas:</strong> las letras que importan (por ejemplo <code>D, E, F</code>). Si lo deja vacío, se mira el contest completo.</li>
+        <li>Un contest se descarta si alguien ya resolvió alguno de esos problemas.</li>
+      </ul>
+    </details>
+    <details>
+      <summary>Gym</summary>
+      <ul>
+        <li>Gyms de Codeforces donde nadie del grupo envió nada. Cualquier veredicto cuenta como tocado.</li>
+        <li>La dificultad va en estrellas, de 1 a 5.</li>
+        <li><strong>Requerir editorial:</strong> solo gyms con tutorial o editorial publicado.</li>
+      </ul>
+    </details>
+    <details>
+      <summary>vjudge</summary>
+      <ul>
+        <li>vjudge envía con sus propias cuentas bot, así que esos AC no aparecen en Codeforces ni en AtCoder.</li>
+        <li>Cargue los handles de vjudge para que cuenten los problemas de Codeforces y AtCoder resueltos ahí.</li>
+      </ul>
+    </details>
+    <details>
+      <summary>Listas guardadas y compartir</summary>
+      <ul>
+        <li><strong>Actualizar:</strong> vuelve a chequear la lista. <strong>Verde</strong> quiere decir completo. <strong>Amarillo</strong> (solo AtCoder) quiere decir a medias, y muestra lo que falta.</li>
+        <li><strong>🔗:</strong> copia un link público que se abre sin login. Muestra cómo se generó la lista y tiene su propio botón Actualizar.</li>
+        <li><strong>Configuraciones guardadas:</strong> guarde handles y parámetros para no tipearlos de nuevo.</li>
+      </ul>
+    </details>
+  </section>
+
   <!-- ===================== Codeforces ===================== -->
-  <section class="tab-panel active" id="panel-codeforces">
+  <section class="tab-panel" id="panel-codeforces">
     <form class="run-form" data-flow="codeforces">
       <div class="config-bar">
         <select class="config-select"><option value="">— Cargar configuración guardada —</option></select>
