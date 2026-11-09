@@ -280,9 +280,9 @@ def generate_recommendations(
     gym.find_untouched_gyms()/select_recommendations() already use.
 
     Returns (result_lines, newly_recommended_keys, items) — items is the
-    full structured dicts (key/url/name/index/solvedCount) in the same order
-    they were found, for callers that want data instead of re-parsing
-    result_lines text (the web backend saves `items` to Mongo). Writing
+    full structured dicts (key/url/name/index/solvedCount) in the order the
+    difficulties/letters were given, for callers that want data instead of
+    re-parsing result_lines text (the web backend saves `items` to Mongo). Writing
     result_lines to a file is the caller's job, same as the other two
     modules leave `output_links`/`output_csv` writing to main().
     """
@@ -320,7 +320,7 @@ def generate_recommendations(
     on_progress("=== Results ===")
     newly_recommended = []
     result_lines = []
-    items = []
+    found_by_label = {}
 
     if letter_mode:
         allowed_round_types = ROUND_TYPE_GROUPS[round_type]
@@ -340,7 +340,7 @@ def generate_recommendations(
                 on_progress(line)
                 result_lines.append(line)
                 newly_recommended.append(p["key"])
-                items.append({**p, "label": letter})
+                found_by_label.setdefault(letter, []).append(p)
 
             if len(found) < needed:
                 note = f"  (only {len(found)} unsolved problems available for letter {letter} in {round_type}-type rounds)"
@@ -364,13 +364,24 @@ def generate_recommendations(
                 on_progress(line)
                 result_lines.append(line)
                 newly_recommended.append(p["key"])
-                items.append({**p, "label": str(rating)})
+                found_by_label.setdefault(str(rating), []).append(p)
 
             if len(found) < needed:
                 note = f"  (only {len(found)} unsolved problems available at this rating)"
                 on_progress(note)
                 result_lines.append(note)
             result_lines.append("")
+
+    # The search above is grouped by value, but `items` keeps the order the
+    # user typed them in (ej. 1600, 1700, 1600 → 1600, 1700, 1600); a value
+    # with too few unsolved problems just leaves its extra slots out.
+    order = [l.upper() for l in letters] if letter_mode else [str(int(d)) for d in difficulties]
+    pools = {label: iter(found_by_label.get(label, [])) for label in order}
+    items = []
+    for label in order:
+        p = next(pools[label], None)
+        if p is not None:
+            items.append({**p, "label": label})
 
     return result_lines, newly_recommended, items
 
