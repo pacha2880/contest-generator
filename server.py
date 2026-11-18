@@ -55,7 +55,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-change-in-pr
 
 # No automation around this yet (no CHANGELOG.md, no CI check) — bump by hand
 # alongside a meaningful batch of changes to the web UI/backend.
-APP_VERSION = "0.10.1"
+APP_VERSION = "0.11.0"
 
 app = FastAPI(title="PachaContests")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -382,8 +382,47 @@ def _refresh_list(doc):
             it["touched"] = True
             it.pop("missing", None)
             newly += 1
-    db.update_saved_list(doc["_id"], items=items)
+    db.update_saved_list(doc["_id"], items=items, params=doc.get("params"))
     return {"newly_touched": newly, **_public_view(db.get_saved_list(doc["_id"]))}
+
+
+# Campos de usuarios editables de una lista, por flujo, y la plataforma con
+# la que se recuerdan para el autocompletado.
+LIST_USER_FIELDS = {
+    "codeforces": {"users": "codeforces", "users_vjudge": "vjudge"},
+    "gym": {"users": "codeforces", "users_vjudge": "vjudge"},
+    "atcoder": {"users_atcoder": "atcoder", "users_vjudge": "vjudge"},
+}
+
+
+class UpdateListUsersBody(BaseModel):
+    users: Optional[List[str]] = None
+    users_atcoder: Optional[List[str]] = None
+    users_vjudge: Optional[List[str]] = None
+
+
+@app.put("/api/lists/{list_id}/users")
+def api_update_list_users(list_id: str, body: UpdateListUsersBody, _=Depends(auth.require_login_api)):
+    """Cambia los usuarios de una lista ya creada (los ítems no cambian) y
+    recalcula sus marcas desde cero con los usuarios nuevos: sacar a alguien
+    también saca los verdes/amarillos que solo venían de él. Si el recálculo
+    falla no se guarda nada."""
+    doc = db.get_saved_list(list_id)
+    if doc is None:
+        raise HTTPException(404, "No encontrada")
+    fields = LIST_USER_FIELDS[doc["flow"]]
+    params = doc.setdefault("params", {})
+    for field in fields:
+        handles = getattr(body, field)
+        if handles is not None:
+            params[field] = [h.strip() for h in handles if h.strip()]
+    for it in doc.get("items") or []:
+        it.pop("touched", None)
+        it.pop("missing", None)
+    result = _refresh_list(doc)
+    for field, platform in fields.items():
+        db.remember_users(platform, params.get(field, []))
+    return result
 
 
 @app.post("/api/lists/{list_id}/refresh")

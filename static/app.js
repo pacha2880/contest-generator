@@ -430,6 +430,14 @@ document.querySelectorAll(".run-form").forEach((form) => {
 
 // --------------------------------------------------- Listas guardadas -----
 
+// Usuarios editables de una lista guardada, por flujo (mismos campos que
+// server.LIST_USER_FIELDS).
+const LIST_USER_FIELDS = {
+  codeforces: [["users", "Usuarios Codeforces"], ["users_vjudge", "Usuarios vjudge"]],
+  gym: [["users", "Usuarios Codeforces"], ["users_vjudge", "Usuarios vjudge"]],
+  atcoder: [["users_atcoder", "Usuarios AtCoder"], ["users_vjudge", "Usuarios vjudge"]],
+};
+
 async function loadSavedLists() {
   const flow = document.getElementById("saved-flow-filter").value;
   const container = document.getElementById("saved-list");
@@ -453,10 +461,12 @@ async function loadSavedLists() {
       <div class="saved-item-head">
         <input type="text" value="${esc(item.title)}">
         <button class="view-btn">Ver</button>
+        <button class="users-btn">Usuarios</button>
         <button class="primary refresh-btn">Actualizar</button>
         <button class="danger delete-btn">Borrar</button>
       </div>
       <p class="saved-meta">${esc(item.flow)} · ${esc(fmtDate(item.created_at))} <span class="refresh-status"></span></p>
+      <form class="saved-users-form" hidden></form>
       <div class="saved-item-body" hidden></div>
     `;
     const titleInput = div.querySelector("input");
@@ -490,6 +500,46 @@ async function loadSavedLists() {
         refreshStatus.textContent = "· no se pudo actualizar";
       } finally {
         refreshBtn.disabled = false;
+      }
+    });
+    // Editar los usuarios de la lista: los ítems no cambian, las marcas se
+    // recalculan desde cero con los usuarios nuevos.
+    const usersForm = div.querySelector(".saved-users-form");
+    div.querySelector(".users-btn").addEventListener("click", async () => {
+      if (!usersForm.hidden) {
+        usersForm.hidden = true;
+        return;
+      }
+      const full = await (await fetch(`/api/lists/${item._id}`)).json();
+      const params = full.params || {};
+      usersForm.innerHTML = LIST_USER_FIELDS[full.flow].map(([field, label]) =>
+        `<label>${label} <input name="${field}" value="${esc((params[field] || []).join(", "))}" placeholder="handle1, handle2"></label>`
+      ).join("") + `<button type="submit" class="primary">Guardar y actualizar</button>`;
+      usersForm.hidden = false;
+    });
+    usersForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const saveBtn = usersForm.querySelector("button");
+      const fd = new FormData(usersForm);
+      const payload = Object.fromEntries([...fd.keys()].map((k) => [k, splitCsv(fd.get(k))]));
+      saveBtn.disabled = true;
+      refreshStatus.textContent = "· guardando usuarios y actualizando...";
+      try {
+        const res = await fetch(`/api/lists/${item._id}/users`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(res.status);
+        const list = await res.json();
+        const done = list.items.filter((it) => it.touched).length;
+        refreshStatus.textContent = `· usuarios guardados, ${done} de ${list.items.length} completos`;
+        usersForm.hidden = true;
+        if (!body.hidden) renderResults(body, list.flow, list.items);
+      } catch (e) {
+        refreshStatus.textContent = "· no se pudieron guardar los usuarios";
+      } finally {
+        saveBtn.disabled = false;
       }
     });
     div.querySelector(".view-btn").addEventListener("click", async () => {

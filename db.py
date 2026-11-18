@@ -164,7 +164,7 @@ def get_list_by_share_token(token):
     return doc
 
 
-def update_saved_list(list_id, *, title=None, items=None):
+def update_saved_list(list_id, *, title=None, items=None, params=None):
     from bson import ObjectId
     db = _get_db()
     if db is None:
@@ -174,6 +174,8 @@ def update_saved_list(list_id, *, title=None, items=None):
         updates["title"] = title
     if items is not None:
         updates["items"] = items
+    if params is not None:
+        updates["params"] = params
     result = db.saved_lists.update_one({"_id": ObjectId(list_id)}, {"$set": updates})
     return result.matched_count > 0
 
