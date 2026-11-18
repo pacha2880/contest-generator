@@ -18,7 +18,8 @@ PachaContests genera recomendaciones de entrenamiento competitivo (problemas de 
 | `gui.py` | GUI de escritorio (FreeSimpleGUI) — ver "Interfaz gráfica" más abajo. |
 | `server.py` | Backend web (FastAPI) — ver "Backend web" más abajo. |
 | `db.py` | Persistencia en MongoDB (usuarios recordados, listas guardadas) para `server.py`. |
-| `auth.py` | Login de contraseña compartida para `server.py`. |
+| `auth.py` | Login con usuario y contraseña para `server.py`. |
+| `users.py` | Crear/listar/renombrar/borrar cuentas y cambiar contraseñas (`py users.py --help`). |
 | `cancel.py` | `StoppedByUser`, usada por los 3 módulos core y por `gui.py`/`server.py` para cancelar una corrida en curso. |
 | `app.py` | Genera problemas nuevos de Codeforces consultando su API. |
 | `atcoder.py` | Recomienda AtCoder Beginner Contests recientes sin resolver por el grupo. |
@@ -223,7 +224,7 @@ py -m uvicorn server:app --reload
 
 Abre en `http://127.0.0.1:8000`. Variables de entorno (todas opcionales para probar local):
 
-- `APP_PASSWORD`: contraseña compartida para el login. Sin ella, el gate queda abierto — no hace falta inventar una para desarrollar.
+- Las cuentas viven en Mongo y se manejan con `py users.py` (`list`, `create`, `passwd`, `rename`, `delete`). Sin `MONGODB_URI` no hay login: entra un admin "local".
 - `SECRET_KEY`: firma la cookie de sesión. Sin ella usa un valor fijo de desarrollo — **hay que setearla en producción**.
 - `MONGODB_URI`: connection string de MongoDB. Sin ella, "usuarios recordados" y "listas guardadas" quedan vacíos pero el resto (correr los 3 flujos, ver progreso en vivo) funciona igual.
 - `PROXY_URL` / `PROXY_KEY`: URL del Cloudflare Worker y su clave (secret `PROXY_KEY` del Worker). Solo en Render; local se dejan sin setear y vjudge/gym se piden directo.
@@ -234,11 +235,11 @@ Abre en `http://127.0.0.1:8000`. Variables de entorno (todas opcionales para pro
 - Progreso en vivo vía Server-Sent Events — mismo patrón de fondo que `gui.py` (hilo aparte + cola de mensajes), transporte distinto (SSE en vez de `window.write_event_value`).
 - Botón Detener por corrida (misma cancelación cooperativa de `cancel.py` que ya usan consola/GUI).
 - Cada corrida se puede guardar con un título editable; "Listas guardadas" las lista, se pueden renombrar o borrar.
-- Login simple de una sola contraseña compartida (sin cuentas individuales).
+- Login con usuario y contraseña (sin correo). Cada usuario ve sus listas, configs y autocompletado; `pacha2880` es admin y ve las listas de todos.
 
 ### Deploy en Render (gratis)
 
-El repo incluye `render.yaml` para deploy con un clic (Render → New → Blueprint, apuntando a este repo). Variables a completar en el dashboard de Render: `APP_PASSWORD`, `MONGODB_URI`, `PROXY_URL` y `PROXY_KEY` (`SECRET_KEY` se genera sola). El plan free "duerme" tras 15 min sin uso — el primer request después tarda unos segundos en levantar, nada más; como la persistencia vive en MongoDB (no en disco local), no se pierde nada con eso.
+El repo incluye `render.yaml` para deploy con un clic (Render → New → Blueprint, apuntando a este repo). Variables a completar en el dashboard de Render: `MONGODB_URI`, `PROXY_URL` y `PROXY_KEY` (`SECRET_KEY` se genera sola). El plan free "duerme" tras 15 min sin uso — el primer request después tarda unos segundos en levantar, nada más; como la persistencia vive en MongoDB (no en disco local), no se pierde nada con eso.
 
 Base de datos: [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) tiene un tier gratis para siempre (M0, 512MB) — alcanza de sobra para esta escala.
 

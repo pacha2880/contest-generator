@@ -15,11 +15,13 @@ transporte.
 Correr local:
     py -m uvicorn server:app --reload
 Variables de entorno (todas opcionales para desarrollo local, ver .env):
-    APP_PASSWORD   contraseña compartida; sin ella el login queda abierto
     SECRET_KEY     firma de la cookie de sesión; sin ella usa un valor fijo
                    de desarrollo (cambiarla es obligatorio en producción)
-    MONGODB_URI    sin ella, "usuarios recordados" y "listas guardadas"
-                   quedan vacíos pero el resto del server funciona igual
+    MONGODB_URI    cuentas, listas y configs. Sin ella no hay login (entra
+                   un admin "local") y no se guarda nada, pero el resto del
+                   server funciona igual
+
+Las cuentas (usuario + contraseña) se manejan con `py users.py`.
 
 En local estas variables se leen de un archivo .env (vía python-dotenv) si
 existe. En Render se setean directo como env vars del servicio, así que ahí
@@ -41,6 +43,7 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from bson.errors import InvalidId
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -55,7 +58,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-secret-change-in-pr
 
 # No automation around this yet (no CHANGELOG.md, no CI check) — bump by hand
 # alongside a meaningful batch of changes to the web UI/backend.
-APP_VERSION = "0.11.0"
+APP_VERSION = "0.12.0"
 
 app = FastAPI(title="PachaContests")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
@@ -99,10 +102,10 @@ def _finish(state, status, error=None, result=None):
     state.queue.put(None)  # sentinel: tells the SSE stream to close
 
 
-def _run_codeforces(state, payload):
+def _run_codeforces(state, payload, owner):
     on_progress = state.queue.put
     try:
-        db.remember_last_config("codeforces", payload)
+        db.remember_last_config("codeforces", payload, owner)
         users = payload.get("users", [])
         users_vjudge = payload.get("users_vjudge", [])
         mode = payload.get("mode", "difficulties")
@@ -115,11 +118,11 @@ def _run_codeforces(state, payload):
             on_progress=on_progress,
             should_stop=state.stop_event.is_set,
         )
-        db.remember_users("codeforces", users)
-        db.remember_users("vjudge", users_vjudge)
+        db.remember_users("codeforces", users, owner)
+        db.remember_users("vjudge", users_vjudge, owner)
         list_id = None
         if payload.get("save"):
-            list_id = db.save_list("codeforces", payload.get("title") or "Sin título", payload, result_lines, items)
+            list_id = db.save_list("codeforces", payload.get("title") or "Sin título", payload, result_lines, items, owner)
         _finish(state, "ok", result={"items": items, "list_id": list_id})
     except StoppedByUser:
         _finish(state, "stopped")
@@ -127,10 +130,10 @@ def _run_codeforces(state, payload):
         _finish(state, "error", error=str(e))
 
 
-def _run_atcoder(state, payload):
+def _run_atcoder(state, payload, owner):
     on_progress = state.queue.put
     try:
-        db.remember_last_config("atcoder", payload)
+        db.remember_last_config("atcoder", payload, owner)
         users_atcoder = payload.get("users_atcoder", [])
         users_vjudge = payload.get("users_vjudge", [])
         count = int(payload.get("count", 5))
@@ -145,11 +148,11 @@ def _run_atcoder(state, payload):
             {"id": c["id"], "title": c.get("title", c["id"]), "link": atcoder.build_link(c["id"])}
             for c in recommended
         ]
-        db.remember_users("atcoder", users_atcoder)
-        db.remember_users("vjudge", users_vjudge)
+        db.remember_users("atcoder", users_atcoder, owner)
+        db.remember_users("vjudge", users_vjudge, owner)
         list_id = None
         if payload.get("save"):
-            list_id = db.save_list("atcoder", payload.get("title") or "Sin título", payload, [], items)
+            list_id = db.save_list("atcoder", payload.get("title") or "Sin título", payload, [], items, owner)
         _finish(state, "ok", result={"items": items, "list_id": list_id})
     except StoppedByUser:
         _finish(state, "stopped")
@@ -157,10 +160,10 @@ def _run_atcoder(state, payload):
         _finish(state, "error", error=str(e))
 
 
-def _run_gym(state, payload):
+def _run_gym(state, payload, owner):
     on_progress = state.queue.put
     try:
-        db.remember_last_config("gym", payload)
+        db.remember_last_config("gym", payload, owner)
         users = payload.get("users", [])
         users_vjudge = payload.get("users_vjudge", [])
         filters = payload.get("filters", {})
@@ -185,11 +188,11 @@ def _run_gym(state, payload):
                 "editorial": editorial,
                 "link": f"https://codeforces.com/gym/{contest['id']}",
             })
-        db.remember_users("codeforces", users)
-        db.remember_users("vjudge", users_vjudge)
+        db.remember_users("codeforces", users, owner)
+        db.remember_users("vjudge", users_vjudge, owner)
         list_id = None
         if payload.get("save"):
-            list_id = db.save_list("gym", payload.get("title") or "Sin título", payload, [], items)
+            list_id = db.save_list("gym", payload.get("title") or "Sin título", payload, [], items, owner)
         _finish(state, "ok", result={"items": items, "list_id": list_id})
     except StoppedByUser:
         _finish(state, "stopped")
@@ -210,12 +213,11 @@ def login_page(request: Request):
 
 
 @app.post("/login")
-def login_submit(request: Request, password: str = Form(...)):
-    if auth.check_password(password):
-        request.session["authenticated"] = True
+def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
+    if auth.login(request, username.strip(), password):
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(
-        request, "login.html", {"error": "Contraseña incorrecta"}, status_code=401,
+        request, "login.html", {"error": "Usuario o contraseña incorrectos"}, status_code=401,
     )
 
 
@@ -227,9 +229,10 @@ def logout(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    if not auth.require_login_page(request):
+    user = auth.current_user(request)
+    if user is None:
         return auth.redirect_to_login()
-    return templates.TemplateResponse(request, "index.html", {})
+    return templates.TemplateResponse(request, "index.html", {"user": user})
 
 
 # ---------------------------------------------------------------------------
@@ -237,12 +240,12 @@ def index(request: Request):
 # ---------------------------------------------------------------------------
 
 @app.post("/api/run/{flow}")
-async def start_run(flow: str, request: Request, _=Depends(auth.require_login_api)):
+async def start_run(flow: str, request: Request, user=Depends(auth.require_login_api)):
     if flow not in RUNNERS:
         raise HTTPException(404, f"Flujo desconocido: {flow}")
     payload = await request.json()
     run_id, state = _new_run()
-    threading.Thread(target=RUNNERS[flow], args=(state, payload), daemon=True).start()
+    threading.Thread(target=RUNNERS[flow], args=(state, payload, user["username"]), daemon=True).start()
     return {"run_id": run_id}
 
 
@@ -281,8 +284,8 @@ def stop_run(run_id: str, _=Depends(auth.require_login_api)):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/known-users")
-def known_users(platform: str, _=Depends(auth.require_login_api)):
-    return db.list_known_users(platform)
+def known_users(platform: str, user=Depends(auth.require_login_api)):
+    return db.list_known_users(platform, user["username"])
 
 
 # ---------------------------------------------------------------------------
@@ -294,32 +297,39 @@ class UpdateListBody(BaseModel):
     items: Optional[List[dict]] = None
 
 
-@app.get("/api/lists")
-def api_list_saved(flow: Optional[str] = None, _=Depends(auth.require_login_api)):
-    return db.list_saved_lists(flow)
-
-
-@app.get("/api/lists/{list_id}")
-def api_get_saved(list_id: str, _=Depends(auth.require_login_api)):
-    doc = db.get_saved_list(list_id)
-    if doc is None:
+def _owned_list(list_id, user):
+    """La lista si es del usuario (o si es admin); si no existe o es ajena,
+    404 igual, para no revelar que existe."""
+    try:
+        doc = db.get_saved_list(list_id)
+    except InvalidId:
+        doc = None
+    if doc is None or not (user["is_admin"] or doc.get("owner") == user["username"]):
         raise HTTPException(404, "No encontrada")
     return doc
 
 
+@app.get("/api/lists")
+def api_list_saved(flow: Optional[str] = None, user=Depends(auth.require_login_api)):
+    return db.list_saved_lists(flow, owner=None if user["is_admin"] else user["username"])
+
+
+@app.get("/api/lists/{list_id}")
+def api_get_saved(list_id: str, user=Depends(auth.require_login_api)):
+    return _owned_list(list_id, user)
+
+
 @app.patch("/api/lists/{list_id}")
-def api_update_saved(list_id: str, body: UpdateListBody, _=Depends(auth.require_login_api)):
-    ok = db.update_saved_list(list_id, title=body.title, items=body.items)
-    if not ok:
-        raise HTTPException(404, "No encontrada")
+def api_update_saved(list_id: str, body: UpdateListBody, user=Depends(auth.require_login_api)):
+    _owned_list(list_id, user)
+    db.update_saved_list(list_id, title=body.title, items=body.items)
     return {"ok": True}
 
 
 @app.delete("/api/lists/{list_id}")
-def api_delete_saved(list_id: str, _=Depends(auth.require_login_api)):
-    ok = db.delete_saved_list(list_id)
-    if not ok:
-        raise HTTPException(404, "No encontrada")
+def api_delete_saved(list_id: str, user=Depends(auth.require_login_api)):
+    _owned_list(list_id, user)
+    db.delete_saved_list(list_id)
     return {"ok": True}
 
 
@@ -402,14 +412,12 @@ class UpdateListUsersBody(BaseModel):
 
 
 @app.put("/api/lists/{list_id}/users")
-def api_update_list_users(list_id: str, body: UpdateListUsersBody, _=Depends(auth.require_login_api)):
+def api_update_list_users(list_id: str, body: UpdateListUsersBody, user=Depends(auth.require_login_api)):
     """Cambia los usuarios de una lista ya creada (los ítems no cambian) y
     recalcula sus marcas desde cero con los usuarios nuevos: sacar a alguien
     también saca los verdes/amarillos que solo venían de él. Si el recálculo
     falla no se guarda nada."""
-    doc = db.get_saved_list(list_id)
-    if doc is None:
-        raise HTTPException(404, "No encontrada")
+    doc = _owned_list(list_id, user)
     fields = LIST_USER_FIELDS[doc["flow"]]
     params = doc.setdefault("params", {})
     for field in fields:
@@ -421,24 +429,19 @@ def api_update_list_users(list_id: str, body: UpdateListUsersBody, _=Depends(aut
         it.pop("missing", None)
     result = _refresh_list(doc)
     for field, platform in fields.items():
-        db.remember_users(platform, params.get(field, []))
+        db.remember_users(platform, params.get(field, []), user["username"])
     return result
 
 
 @app.post("/api/lists/{list_id}/refresh")
-def api_refresh_saved(list_id: str, _=Depends(auth.require_login_api)):
-    doc = db.get_saved_list(list_id)
-    if doc is None:
-        raise HTTPException(404, "No encontrada")
-    return _refresh_list(doc)
+def api_refresh_saved(list_id: str, user=Depends(auth.require_login_api)):
+    return _refresh_list(_owned_list(list_id, user))
 
 
 @app.get("/api/lists/{list_id}/share")
-def api_share_saved(list_id: str, _=Depends(auth.require_login_api)):
-    token = db.get_share_token(list_id)
-    if token is None:
-        raise HTTPException(404, "No encontrada")
-    return {"token": token}
+def api_share_saved(list_id: str, user=Depends(auth.require_login_api)):
+    _owned_list(list_id, user)
+    return {"token": db.get_share_token(list_id)}
 
 
 # ---------------------------------------------------------------------------
@@ -476,32 +479,32 @@ class SaveConfigBody(BaseModel):
 
 
 @app.get("/api/configs/{flow}/last")
-def api_get_last_config(flow: str, _=Depends(auth.require_login_api)):
-    return {"params": db.get_last_config(flow)}
+def api_get_last_config(flow: str, user=Depends(auth.require_login_api)):
+    return {"params": db.get_last_config(flow, user["username"])}
 
 
 @app.get("/api/configs/{flow}")
-def api_list_configs(flow: str, _=Depends(auth.require_login_api)):
-    return db.list_named_configs(flow)
+def api_list_configs(flow: str, user=Depends(auth.require_login_api)):
+    return db.list_named_configs(flow, user["username"])
 
 
 @app.post("/api/configs/{flow}")
-def api_save_config(flow: str, body: SaveConfigBody, _=Depends(auth.require_login_api)):
-    config_id = db.save_named_config(flow, body.name, body.params)
+def api_save_config(flow: str, body: SaveConfigBody, user=Depends(auth.require_login_api)):
+    config_id = db.save_named_config(flow, body.name, body.params, user["username"])
     return {"_id": config_id}
 
 
 @app.get("/api/configs/{flow}/{config_id}")
-def api_get_config(flow: str, config_id: str, _=Depends(auth.require_login_api)):
-    doc = db.get_named_config(config_id)
+def api_get_config(flow: str, config_id: str, user=Depends(auth.require_login_api)):
+    doc = db.get_named_config(config_id, user["username"])
     if doc is None:
         raise HTTPException(404, "No encontrada")
     return doc
 
 
 @app.delete("/api/configs/{flow}/{config_id}")
-def api_delete_config(flow: str, config_id: str, _=Depends(auth.require_login_api)):
-    ok = db.delete_named_config(config_id)
+def api_delete_config(flow: str, config_id: str, user=Depends(auth.require_login_api)):
+    ok = db.delete_named_config(config_id, user["username"])
     if not ok:
         raise HTTPException(404, "No encontrada")
     return {"ok": True}

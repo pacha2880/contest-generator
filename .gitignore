@@ -12,3 +12,6 @@ outputs/
 
 .DS_Store
 Thumbs.db
+
+# Contraseñas iniciales de cuentas creadas con users.py
+users_credentials.txt

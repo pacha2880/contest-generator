@@ -14,7 +14,8 @@
       <h1>PachaContests</h1>
     </div>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
-    <input type="password" name="password" placeholder="Contraseña" autofocus required>
+    <input type="text" name="username" placeholder="Usuario" autocomplete="username" autofocus required>
+    <input type="password" name="password" placeholder="Contraseña" autocomplete="current-password" required>
     <button type="submit">Entrar</button>
   </form>
 

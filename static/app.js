@@ -430,6 +430,9 @@ document.querySelectorAll(".run-form").forEach((form) => {
 
 // --------------------------------------------------- Listas guardadas -----
 
+// El admin ve las listas de todos; a él se le muestra de quién es cada una.
+const IS_ADMIN = document.body.dataset.admin === "1";
+
 // Usuarios editables de una lista guardada, por flujo (mismos campos que
 // server.LIST_USER_FIELDS).
 const LIST_USER_FIELDS = {
@@ -465,7 +468,7 @@ async function loadSavedLists() {
         <button class="primary refresh-btn">Actualizar</button>
         <button class="danger delete-btn">Borrar</button>
       </div>
-      <p class="saved-meta">${esc(item.flow)} · ${esc(fmtDate(item.created_at))} <span class="refresh-status"></span></p>
+      <p class="saved-meta">${esc(item.flow)} · ${esc(fmtDate(item.created_at))}${IS_ADMIN && item.owner ? ` · ${esc(item.owner)}` : ""} <span class="refresh-status"></span></p>
       <form class="saved-users-form" hidden></form>
       <div class="saved-item-body" hidden></div>
     `;
